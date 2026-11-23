@@ -3,11 +3,26 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
+.DS_Store
 
-# Ignore specific directories in the monorepo
-/steadfast-app/node_modules/
-/steadfast-api/node_modules/
-/steadfast-websocket/__pycache__/
+# Dependencies and generated files
+node_modules/
+dist/
+dist-ssr/
+coverage/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.log
 
-# Ignore nested .git directories
-# **/.git
+# Local configuration and private keys
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.key
+*.p12
+*.pfx

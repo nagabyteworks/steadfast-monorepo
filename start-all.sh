@@ -120,13 +120,13 @@ update_and_run() {
 # Function to run the existing version
 run() {
     echo "Starting API..."
-    bash -c "cd steadfast-api && node server.js & "
+    bash -c "cd steadfast-api && NODE_ENV=development node server.js & "
 
     echo "Starting app..."
     bash -c "cd steadfast-app && npm run dev & "
 
     echo "Starting WebSocket server..."
-    bash -c "cd steadfast-websocket && source venv/bin/activate && python main.py & "
+    bash -c "cd steadfast-websocket && source venv/bin/activate && ENV=development python main.py & "
 
     sleep 5
 

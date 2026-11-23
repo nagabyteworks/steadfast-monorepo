@@ -1,0 +1,39 @@
+trade.nagabyte.com {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+	}
+
+	route {
+		@untrusted not remote_ip {$STEADFAST_ALLOWED_CIDR:127.0.0.1/32}
+		respond @untrusted "Forbidden" 403
+
+		basic_auth {
+			import {$STEADFAST_AUTH_FILE:/etc/caddy/steadfast-auth}
+		}
+
+		handle /flattrade/redirect {
+			root * /opt/steadfast/steadfast-app/dist
+			try_files /index.html
+			file_server
+		}
+
+		handle /ws/flattrade {
+			reverse_proxy 127.0.0.1:8765
+		}
+
+		@api path /flattrade/* /shoonya/* /virtual/* /set-broker
+		handle @api {
+			reverse_proxy 127.0.0.1:3001
+		}
+
+		handle {
+			root * /opt/steadfast/steadfast-app/dist
+			try_files {path} /index.html
+			file_server
+		}
+	}
+}

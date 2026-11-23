@@ -136,7 +136,7 @@ goto menu
 :run
 REM Start the API in a new command prompt window
 echo Starting API...
-start /min cmd /c "cd steadfast-api && node server.js"
+start /min cmd /c "cd steadfast-api && set NODE_ENV=development&& node server.js"
 
 REM Start the app in a new command prompt window
 echo Starting app...
@@ -144,7 +144,7 @@ start /min cmd /c "cd steadfast-app && npm run dev"
 
 REM Start the WebSocket server in a new command prompt window
 echo Starting WebSocket server...
-start /min cmd /c "cd steadfast-websocket && python main.py"
+start /min cmd /c "cd steadfast-websocket && set ENV=development&& python main.py"
 
 REM Wait for a few seconds to allow the app to start
 timeout /t 5
