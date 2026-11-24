@@ -39,7 +39,7 @@ authenticated before any public exposure.
 - The working tree includes three Git submodules. Publish the appropriate
   child repository changes and update the parent submodule references before
   cloning; do not assume local uncommitted changes exist on EC2.
-- Install a compatible system-wide Node.js and Python, create the
+- Install Node.js 22.13 or newer and a compatible system-wide Python, create the
   `steadfast` service user, install the dependencies, and build the frontend.
   The units use `/usr/bin/env node`; Node must be on systemd's service PATH and
   must not depend on a shell-only `nvm` setup or a protected home directory.
@@ -59,9 +59,15 @@ authenticated before any public exposure.
   endpoints and a checksum-pinned SDK from Flattrade's official repository.
   Confirm these endpoints, the callback URL
   `https://trade.nagabyte.com/flattrade/redirect`, and the EC2 **outbound** IP
-  against the broker's current configuration. Session login must be repeated
-  after an API restart. Reauthentication requests a supervised restart of the
-  streaming process, so the WebSocket service must run under systemd.
+  against the broker's current configuration. An unexpired saved session can
+  be restored after an API restart; Flattrade can still invalidate it earlier.
+  Login, logout, and expiry restart the streaming process, so the WebSocket
+  service must run under systemd.
+- The API stores the session in a SQLite database under
+  `/var/lib/steadfast-api`, protected by the API unit's private systemd state
+  directory. Tokens are not encrypted at rest; restrict host and backup access.
+  The saved and in-memory session expire at 6:00 AM Asia/Kolkata, and local
+  logout deletes both. Logout does not revoke the session at Flattrade.
 - The production API systemd unit has `TRADING_ENABLED=true`, which permits
   live Flattrade order placement and cancellation after deployment. Set it to
   `false` and restart `steadfast-api.service` to disable those routes. Production
@@ -86,19 +92,27 @@ account on the server first.
 
 From the `/opt/steadfast` checkout on `main`, run `./deploy.sh`. It fetches and
 fast-forwards to `origin/main`, checks out the submodule revisions recorded by
-that commit, installs dependencies, builds the frontend, and restarts and checks
-the API and WebSocket systemd services. The checkout and its submodules must be
+that commit, installs dependencies, builds the frontend, and restarts the API
+and WebSocket systemd services. It checks that both services are active and
+the API health endpoint responds; it does not verify the broker stream. The checkout and its submodules must be
 clean, including generated tracked symbol files; preserve and resolve any local
 changes before running it. The deploying user needs write access to the checkout
 and virtual environment, network access, and sudo permission to restart the two
 services. The existing systemd units and Caddy configuration are not installed
 or changed by this script.
 
+Before the first deployment of SQLite session storage, compare the installed
+API unit with `deploy/systemd/steadfast-api.service`, preserving any intentional
+local overrides. Update the installed unit to include `StateDirectory=steadfast-api`
+and `StateDirectoryMode=0700`, then run `sudo -A systemctl daemon-reload`.
+The deploy script refuses to restart with the old unit. Only the API service
+user should have access to the state directory and its backups.
+
 Deployment modifies files in place and has no automatic rollback: a failure may
 leave files or services partially updated. Schedule it when interruptions are
 safe, inspect errors and service status if it fails, and verify broker positions
-and orders independently. API restart requires logging in again; service
-activity checks do not prove broker connectivity or successful trading.
+and orders independently. Service activity checks do not prove broker
+connectivity or successful trading.
 
 ## Validation and eventual cutover
 

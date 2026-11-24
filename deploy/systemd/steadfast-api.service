@@ -17,6 +17,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+StateDirectory=steadfast-api
+StateDirectoryMode=0700
 ReadWritePaths=/opt/steadfast/steadfast-api/symbols
 
 [Install]

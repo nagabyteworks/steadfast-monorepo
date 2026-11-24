@@ -37,15 +37,30 @@ fi
 git merge --ff-only origin/main
 git submodule update --init --recursive
 
+if [[ "$(systemctl show steadfast-api.service --property=StateDirectory --value)" != "steadfast-api" ]] ||
+   [[ "$(systemctl show steadfast-api.service --property=StateDirectoryMode --value)" != "0700" ]]; then
+    echo "The installed API unit needs StateDirectory=steadfast-api and StateDirectoryMode=0700. Review and update it, then run systemctl daemon-reload; see deploy/README.md." >&2
+    exit 1
+fi
+
 echo "Installing dependencies and building the frontend..."
+node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 13)) { console.error("Node.js 22.13 or newer is required."); process.exit(1); }'
 npm ci --omit=dev --prefix steadfast-api
 npm install --include=dev --no-package-lock --prefix steadfast-app
-npm run build --prefix steadfast-app
 python3 -m venv steadfast-websocket/.venv
 steadfast-websocket/.venv/bin/python -m pip install -r steadfast-websocket/requirements.txt
+npm run build --prefix steadfast-app
 
 echo "Restarting Steadfast services..."
 sudo -A systemctl restart steadfast-api.service steadfast-websocket.service
-systemctl is-active --quiet steadfast-api.service
-systemctl is-active --quiet steadfast-websocket.service
-echo "Deployment complete. Broker login must be repeated after the API restart."
+for attempt in {1..30}; do
+    if systemctl is-active --quiet steadfast-api.service &&
+       systemctl is-active --quiet steadfast-websocket.service &&
+       curl --fail --silent --show-error --max-time 2 http://127.0.0.1:3001/health >/dev/null 2>&1; then
+        echo "Deployment complete. Verify the broker session and stream before trading."
+        exit 0
+    fi
+    sleep 1
+done
+echo "Services did not become ready. Check the API and WebSocket systemd logs before retrying." >&2
+exit 1
