@@ -65,7 +65,7 @@ authenticated before any public exposure.
 - The production API systemd unit has `TRADING_ENABLED=true`, which permits
   live Flattrade order placement and cancellation after deployment. Set it to
   `false` and restart `steadfast-api.service` to disable those routes. Production
-  orders are limited to NSE derivatives and one contract lot per order; this
+  orders are limited to NFO and BFO derivatives and ten contract lots per order; this
   does not cap total exposure or daily loss.
 - Stop-loss/target automation is optional and browser-run, not broker-side.
   Keep the trading page open with its market-data connection active. If both
@@ -81,6 +81,24 @@ The included systemd units force production mode and loopback addresses.
 Shoonya and virtual trading are disabled in production. Legacy browser broker
 secrets are removed from local storage on first production load; configure the
 account on the server first.
+
+## Updating an existing installation
+
+From the `/opt/steadfast` checkout on `main`, run `./deploy.sh`. It fetches and
+fast-forwards to `origin/main`, checks out the submodule revisions recorded by
+that commit, installs dependencies, builds the frontend, and restarts and checks
+the API and WebSocket systemd services. The checkout and its submodules must be
+clean, including generated tracked symbol files; preserve and resolve any local
+changes before running it. The deploying user needs write access to the checkout
+and virtual environment, network access, and sudo permission to restart the two
+services. The existing systemd units and Caddy configuration are not installed
+or changed by this script.
+
+Deployment modifies files in place and has no automatic rollback: a failure may
+leave files or services partially updated. Schedule it when interruptions are
+safe, inspect errors and service status if it fails, and verify broker positions
+and orders independently. API restart requires logging in again; service
+activity checks do not prove broker connectivity or successful trading.
 
 ## Validation and eventual cutover
 

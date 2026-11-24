@@ -57,11 +57,13 @@ steadfast-monorepo/
 Broker credentials and accounts are needed to use broker integrations. Do not commit credentials, session tokens, or other secrets.
 Each repository ignores local `.env` files and private-key files; `.env.example` files remain available for non-secret templates. Git ignore rules do not protect files that are already tracked or staged, including the existing frontend environment files and WebSocket `.env`; keep secrets out of those files and review staged files before committing.
 
-**Live trading:** Production Flattrade order placement and cancellation require `TRADING_ENABLED=true`; the production systemd unit enables this flag. Set it to `false` and restart the API service to disable trading. Production orders are restricted to NSE derivatives and the API rejects any individual order larger than one lot, using the Flattrade scrip master. This is a per-order cap, not a cap on total positions, order count, or daily loss.
+**Live trading:** Production Flattrade order placement and cancellation require `TRADING_ENABLED=true`; the production systemd unit enables this flag. Set it to `false` and restart the API service to disable trading. Production orders are restricted to NFO and BFO derivatives and the API rejects individual orders larger than ten lots, using the Flattrade scrip master. This is a per-order cap, not a cap on total positions, order count, or daily loss.
 
 Predefined stop-loss and target controls are optional and default to off. When enabled, their point values are monitored by the browser and exit orders are submitted from the browser. The app must remain open with a working market-data connection; this is not broker-side protection and can stop working if the browser, network, or stream disconnects. If both controls are off, a live entry has no automatic stop-loss or target. Check order acknowledgements, positions, and any protective actions directly with Flattrade. Never commit or share broker credentials or session tokens.
 
 Automatic exits require browser Web Locks and use a persistent per-symbol safety lock to prevent retries after an accepted, rejected, or uncertain submission. Verify orders and positions in Flattrade before using the trading page's reset control. Locks coordinate tabs in the same browser only; they do not coordinate other browsers, devices, or manual broker orders.
+
+The optional Buy Both and Sell Both buttons submit separate CE and PE orders simultaneously; either leg can fail or remain unfilled independently. They are unavailable for manual Limit orders. Product type and click sounds are configured in Settings. The kill switch and automatic overtrade protection have been removed.
 
 ## Clone and install
 
