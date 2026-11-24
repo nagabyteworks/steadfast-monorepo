@@ -1,9 +1,8 @@
 # EC2 deployment preparation
 
-This is a read-only Flattrade deployment, not a live-trading release. Production
-placements, modifications, cancellations, and browser-managed risk automation
-must remain unavailable. The Steadfast API and WebSocket services are configured
-with separate service users. The scalpX service and files must remain intact;
+This deployment supports live Flattrade trading when explicitly enabled in the
+API service. The Steadfast API and WebSocket services are configured with
+separate service users. The scalpX service and files must remain intact;
 changing the public Caddy route does not require stopping or deleting them.
 
 ## Intended layout
@@ -73,6 +72,10 @@ authenticated before any public exposure.
   UI toggles are off, orders have no automatic stop-loss or target; even when
   enabled, a browser or network interruption can stop the monitoring. Verify
   orders and positions directly with Flattrade.
+- Automatic exits require Web Locks and persist a per-symbol safety lock after
+  an attempted submission. Verify broker orders and positions before resetting
+  the lock in the trading page. Locks only coordinate tabs in the same browser;
+  other devices and broker-side actions are not coordinated.
 
 The included systemd units force production mode and loopback addresses.
 Shoonya and virtual trading are disabled in production. Legacy browser broker
@@ -81,13 +84,11 @@ account on the server first.
 
 ## Validation and eventual cutover
 
-1. Complete broker-side risk management and restart/reconciliation behavior;
-   independently test acknowledgements, partial fills, rejections, duplicate
+1. Independently test acknowledgements, partial fills, rejections, duplicate
    requests, outages, and manual-intervention states without submitting live
-   orders. Do not remove the production trading gate before explicit approval.
-2. Resolve the local sandbox's denied listener permission and run actual
-   HTTP/WebSocket integration tests. On EC2, test the services privately before
-   changing Caddy; verify broker login and fresh market data without orders.
+   orders. Browser-based protection is not broker-side risk management.
+2. Test the services privately before changing Caddy; verify broker login and
+   fresh market data without orders.
 3. Check DNS, TLS, the Flattrade portal's approved outbound IP, and the Basic
    Auth and WebSocket behavior. Validate Caddy's configuration using its
    installed version and verify the systemd units on Ubuntu. The local Caddy

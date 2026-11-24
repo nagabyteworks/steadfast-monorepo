@@ -61,6 +61,8 @@ Each repository ignores local `.env` files and private-key files; `.env.example`
 
 Predefined stop-loss and target controls are optional and default to off. When enabled, their point values are monitored by the browser and exit orders are submitted from the browser. The app must remain open with a working market-data connection; this is not broker-side protection and can stop working if the browser, network, or stream disconnects. If both controls are off, a live entry has no automatic stop-loss or target. Check order acknowledgements, positions, and any protective actions directly with Flattrade. Never commit or share broker credentials or session tokens.
 
+Automatic exits require browser Web Locks and use a persistent per-symbol safety lock to prevent retries after an accepted, rejected, or uncertain submission. Verify orders and positions in Flattrade before using the trading page's reset control. Locks coordinate tabs in the same browser only; they do not coordinate other browsers, devices, or manual broker orders.
+
 ## Clone and install
 
 Clone the repository and enter its directory:
