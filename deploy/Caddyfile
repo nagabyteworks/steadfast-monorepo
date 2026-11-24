@@ -8,9 +8,6 @@ trade.nagabyte.com {
 	}
 
 	route {
-		@untrusted not remote_ip {$STEADFAST_ALLOWED_CIDR:127.0.0.1/32}
-		respond @untrusted "Forbidden" 403
-
 		basic_auth {
 			import {$STEADFAST_AUTH_FILE:/etc/caddy/steadfast-auth}
 		}
@@ -25,7 +22,7 @@ trade.nagabyte.com {
 			reverse_proxy 127.0.0.1:8765
 		}
 
-		@api path /flattrade/* /shoonya/* /virtual/* /set-broker
+		@api path /health /flattrade/* /shoonya/* /virtual/* /set-broker
 		handle @api {
 			reverse_proxy 127.0.0.1:3001
 		}

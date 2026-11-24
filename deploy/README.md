@@ -1,17 +1,10 @@
 # EC2 deployment preparation
 
-**Do not cut over yet.** The configuration in this directory is a draft for a
-read-only Flattrade deployment, not a live-trading release. HTTP/WebSocket
-integration, broker authentication, streaming, and this systemd configuration
-have not been verified on the EC2 host. Broker-side protective SL-limit orders
-and backend target progression are not implemented. Production placements,
-modifications, cancellations, and browser-managed risk automation must remain
-unavailable until those requirements are implemented and tested.
-
-The existing scalpX service and Caddy configuration have not been changed.
-Before stopping scalpX, inspect positions and pending orders at the broker.
-Stopping scalpX can interrupt any protection or targets it manages in memory;
-broker-side orders can remain open.
+This is a read-only Flattrade deployment, not a live-trading release. Production
+placements, modifications, cancellations, and browser-managed risk automation
+must remain unavailable. The Steadfast API and WebSocket services are configured
+with separate service users. The scalpX service and files must remain intact;
+changing the public Caddy route does not require stopping or deleting them.
 
 ## Intended layout
 
@@ -29,21 +22,18 @@ Port 3001 avoids the observed scalpX listener on port 3000. Recheck all ports on
 the instance before installation. Only Caddy should be exposed publicly; keep
 the API, WebSocket, and selector bound to loopback.
 
-The Caddy configuration permits only the CIDR supplied in
-`STEADFAST_ALLOWED_CIDR`, then requires HTTP Basic authentication on every
-route, including the WebSocket and callback. It defaults to `127.0.0.1/32` if
-the CIDR is not configured. Set it to the **client's** trusted public IP/CIDR,
-not the EC2 outbound IP; do not use a public-wide CIDR. A changing client IP
-will require an update. This configuration assumes Caddy sees the actual
-client IP directly, without a load balancer or other proxy in front.
+The Caddy configuration requires HTTP Basic authentication on every route,
+including the WebSocket and callback, and does not restrict clients by IP
+address. This allows access from different networks while keeping the API and
+broker listeners private on loopback.
 
 `STEADFAST_AUTH_FILE` defaults to `/etc/caddy/steadfast-auth`. That file must
 contain a Caddy Basic Auth username and a bcrypt password hash, not a plaintext
 password. Generate the hash with Caddy's `hash-password` command on the host;
 use a unique strong password, and restrict file access to Caddy and
-administrators. Supply the CIDR through Caddy's systemd environment, validate
-the configuration under the same environment, and verify that both HTTP and
-WebSocket requests are authenticated before any public exposure.
+administrators. Validate the configuration using the same environment as the
+Caddy service, and verify that HTTP, WebSocket, and callback requests are
+authenticated before any public exposure.
 
 ## Service prerequisites
 
@@ -88,11 +78,11 @@ account on the server first.
 2. Resolve the local sandbox's denied listener permission and run actual
    HTTP/WebSocket integration tests. On EC2, test the services privately before
    changing Caddy; verify broker login and fresh market data without orders.
-3. Check DNS, TLS, the instance's actual outbound IP, the Flattrade portal's
-   approved IP, the client allowlist, and the Basic Auth and WebSocket behavior.
-   Validate Caddy's configuration using its installed version and verify the
-   systemd units on Ubuntu. The local Caddy syntax check does not establish
-   compatibility with the server or prove access control end to end.
+3. Check DNS, TLS, the Flattrade portal's approved outbound IP, and the Basic
+   Auth and WebSocket behavior. Validate Caddy's configuration using its
+   installed version and verify the systemd units on Ubuntu. The local Caddy
+   syntax check does not establish compatibility with the server or prove
+   access control end to end.
 4. Back up the current Caddy configuration and record the scalpX service state.
    After positions and orders are reviewed and cutover is explicitly approved,
    switch the site to the new configuration and reload Caddy. Verify TLS,

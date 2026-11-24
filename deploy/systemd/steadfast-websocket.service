@@ -2,16 +2,20 @@
 Description=Steadfast broker streaming service
 Wants=network-online.target
 After=network-online.target steadfast-api.service
+Requires=steadfast-api.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
-User=steadfast
-Group=steadfast
+User=steadfast-ws
+Group=steadfast-ws
+SupplementaryGroups=steadfast
 WorkingDirectory=/opt/steadfast/steadfast-websocket
 EnvironmentFile=/etc/steadfast/websocket.env
 ExecStart=/usr/bin/env ENV=production API_BASE_URL=http://127.0.0.1:3001 WS_HOST=127.0.0.1 WS_ALLOWED_ORIGIN=https://trade.nagabyte.com PYTHONUNBUFFERED=1 /opt/steadfast/steadfast-websocket/.venv/bin/python main.py
 Restart=on-failure
-RestartSec=5
+RestartSec=30
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
