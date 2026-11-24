@@ -57,7 +57,9 @@ steadfast-monorepo/
 Broker credentials and accounts are needed to use broker integrations. Do not commit credentials, session tokens, or other secrets.
 Each repository ignores local `.env` files and private-key files; `.env.example` files remain available for non-secret templates. Git ignore rules do not protect files that are already tracked or staged, including the existing frontend environment files and WebSocket `.env`; keep secrets out of those files and review staged files before committing.
 
-**Trading safety:** Production broker order placement and cancellation are blocked even if `TRADING_ENABLED=true`; broker-side protective orders and backend target management are not implemented. Browser stoploss/target automation is disabled in production. Manage existing positions and protective orders directly with the broker. In development, only an explicit `TRADING_ENABLED=true` enables broker order endpoints and proxy routes. Do not enable it without explicit authorization. This gate cannot affect broker orders already placed or orders submitted outside this API.
+**Live trading:** Production Flattrade order placement and cancellation require `TRADING_ENABLED=true`; the production systemd unit enables this flag. Set it to `false` and restart the API service to disable trading. Production orders are restricted to NSE derivatives and the API rejects any individual order larger than one lot, using the Flattrade scrip master. This is a per-order cap, not a cap on total positions, order count, or daily loss.
+
+Predefined stop-loss and target controls are optional and default to off. When enabled, their point values are monitored by the browser and exit orders are submitted from the browser. The app must remain open with a working market-data connection; this is not broker-side protection and can stop working if the browser, network, or stream disconnects. If both controls are off, a live entry has no automatic stop-loss or target. Check order acknowledgements, positions, and any protective actions directly with Flattrade. Never commit or share broker credentials or session tokens.
 
 ## Clone and install
 

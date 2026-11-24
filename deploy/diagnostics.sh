@@ -687,17 +687,23 @@ elif [ "$(id -u)" -eq 0 ]; then
 else
     trading_flag=""
 fi
-if [ "$trading_flag" = "false" ]; then
+unit_trading_flag="$(sed -n 's/.*TRADING_ENABLED=\([^ ]*\).*/\1/p' "$ROOT/deploy/systemd/steadfast-api.service" 2>/dev/null | tail -n 1)"
+if [ -n "$unit_trading_flag" ]; then
+    trading_flag="$unit_trading_flag"
+fi
+if [ "$trading_flag" = "true" ]; then
+    warn "TRADING_ENABLED is true; production order routes can submit live orders"
+elif [ "$trading_flag" = "false" ]; then
     pass "TRADING_ENABLED is false"
 elif [ -z "$trading_flag" ]; then
     warn "TRADING_ENABLED could not be read; run diagnostics with appropriate file access"
 else
-    fail "TRADING_ENABLED is not false"
+    fail "TRADING_ENABLED must be exactly true or false"
 fi
-if grep -q 'process.env.NODE_ENV === "production"' "$API/middleware/requireTradingEnabled.js" 2>/dev/null; then
-    pass "API production trading gate is present"
+if grep -Fq 'process.env.TRADING_ENABLED !== "true"' "$API/middleware/requireTradingEnabled.js" 2>/dev/null; then
+    pass "API trading flag gate is present"
 else
-    fail "API production trading gate was not found"
+    fail "API trading flag gate was not found"
 fi
 if grep -Eiq 'placeOrder|cancelOrder|modifyOrder' "$API/middleware/requireTradingEnabled.js" 2>/dev/null; then
     warn "Trading gate source references order operations; review before changing"

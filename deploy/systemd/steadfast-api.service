@@ -1,5 +1,5 @@
 [Unit]
-Description=Steadfast API (production trading disabled)
+Description=Steadfast API (Flattrade production trading)
 Wants=network-online.target
 After=network-online.target
 
@@ -10,7 +10,7 @@ Group=steadfast-api
 SupplementaryGroups=steadfast
 WorkingDirectory=/opt/steadfast/steadfast-api
 EnvironmentFile=/etc/steadfast/api.env
-ExecStart=/usr/bin/env NODE_ENV=production API_HOST=127.0.0.1 PORT=3001 CORS_ORIGIN=https://trade.nagabyte.com TRADING_ENABLED=false node server.js
+ExecStart=/usr/bin/env NODE_ENV=production API_HOST=127.0.0.1 PORT=3001 CORS_ORIGIN=https://trade.nagabyte.com TRADING_ENABLED=true node server.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

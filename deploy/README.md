@@ -63,6 +63,16 @@ authenticated before any public exposure.
   against the broker's current configuration. Session login must be repeated
   after an API restart. Reauthentication requests a supervised restart of the
   streaming process, so the WebSocket service must run under systemd.
+- The production API systemd unit has `TRADING_ENABLED=true`, which permits
+  live Flattrade order placement and cancellation after deployment. Set it to
+  `false` and restart `steadfast-api.service` to disable those routes. Production
+  orders are limited to NSE derivatives and one contract lot per order; this
+  does not cap total exposure or daily loss.
+- Stop-loss/target automation is optional and browser-run, not broker-side.
+  Keep the trading page open with its market-data connection active. If both
+  UI toggles are off, orders have no automatic stop-loss or target; even when
+  enabled, a browser or network interruption can stop the monitoring. Verify
+  orders and positions directly with Flattrade.
 
 The included systemd units force production mode and loopback addresses.
 Shoonya and virtual trading are disabled in production. Legacy browser broker
