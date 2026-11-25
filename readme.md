@@ -55,7 +55,7 @@ steadfast-monorepo/
 - The root `npm start` command uses Unix virtual-environment paths and is intended for macOS/Linux. Windows users can use `start-all.bat`.
 
 Broker credentials and accounts are needed to use broker integrations. Do not commit credentials, session tokens, or other secrets.
-Each repository ignores local `.env` files and private-key files; `.env.example` files remain available for non-secret templates. Git ignore rules do not protect files that are already tracked or staged, including the existing frontend environment files and WebSocket `.env`; keep secrets out of those files and review staged files before committing.
+Each repository ignores local `.env` files and private-key files. Git ignore rules do not protect files that are already tracked or staged, including the existing frontend environment files and WebSocket `.env`; keep secrets out of those files and review staged files before committing.
 
 **Live trading:** Production Flattrade order placement and cancellation require `TRADING_ENABLED=true`; the production systemd unit enables this flag. Set it to `false` and restart the API service to disable trading. Production orders are restricted to NFO derivatives and the API rejects individual orders larger than one lot, using the Flattrade scrip master. This is a per-order cap, not a cap on total positions, order count, or daily loss.
 
@@ -97,19 +97,42 @@ Run the Python install commands from `steadfast-websocket`. On Windows, use the 
 
 ## Start the application
 
-From the repository root on macOS/Linux:
+1. In the repository root, create or edit the ignored `.env` file:
 
-```bash
-npm start
-```
+   ```dotenv
+   profile=dev
+   FLATTRADE_CLIENT_ID=
+   FLATTRADE_API_KEY=
+   FLATTRADE_API_SECRET=
+   TRADING_ENABLED=false
+   ```
 
-This starts the API, frontend, and Python WebSocket service concurrently. Open **http://localhost:5173**. The Python service waits for broker selection in the application before connecting to the selected broker. Use **Ctrl+C** to stop the root command.
+   Enter your development Flattrade credentials directly in this file. Set all three credential fields together; never commit or share them. Restrict access with `chmod 600 .env` on macOS/Linux. If the file already exists, edit it rather than replacing it.
+
+   `TRADING_ENABLED=false` prevents real order placement and cancellation. To enable live trading, set it to `true` only after adding all three credentials; orders use real funds. Restart the services after changing the file. If live trading is enabled without all credentials, the API and frontend will not start.
+
+2. From the repository root on macOS/Linux, install dependencies once:
+
+   ```bash
+   npm install
+   npm run install:all
+   ```
+
+3. Start all three services:
+
+   ```bash
+   npm start
+   ```
+
+4. Open **http://localhost:5173**, go to **Manage Brokers**, and select **Generate Token** for Flattrade. Complete the broker login in the popup, then select the broker in the application. The Python service connects after broker selection. The development session is kept in API memory, so log in again after an API restart.
+
+Use **Ctrl+C** in the terminal to stop the root command. If `profile=dev` is absent, the services default to production and require production configuration.
 
 Root scripts can also start each service independently:
 
 | Command | Purpose | Default address/port |
 | --- | --- | --- |
-| `npm run api` | Start the API in development mode | `http://localhost:3000` |
+| `npm run api` | Start the API using the configured profile | `http://localhost:3000` |
 | `npm run app` | Start the Vite frontend | `http://localhost:5173` |
 | `npm run websocket` | Start the Python broker WebSocket service | `5000` IPC; `8765` Flattrade / `8766` Shoonya |
 
@@ -125,14 +148,15 @@ For Windows, `start-all.bat` provides an interactive menu. The `start-all.sh` an
 
 ## Configuration
 
-The repository root `.env` file controls the runtime profile for all three services. Set `profile=dev` for local development; if `profile=dev` is absent, the profile defaults to `prod`. The checked-in `.env.example` shows the local setting; copy it to `.env` when setting up a fresh checkout. The root `.env` is ignored by Git.
+The repository root `.env` file controls the runtime profile for all three services. Set `profile=dev` for local development; if `profile=dev` is absent, the profile defaults to `prod`. The root `.env` is local-only and ignored by Git; create it on each machine that needs local configuration.
 
 Configuration is otherwise service-specific:
 
 - **API:** `PORT` sets the API port (default `3000`), and `API_HOST` sets its listen address (default `127.0.0.1`, loopback required in production). `CORS_ORIGIN` sets the permitted browser origin; production requires an HTTPS origin and rejects state-changing requests without a matching `Origin` header. Development defaults to `http://localhost:5173`.
 - **Frontend:** `VITE_BASE_URL` sets the API base URL and is used when deriving the production WebSocket URL. The production environment file defaults to `https://trade.nagabyte.com`. A production build requires an HTTPS origin without a path; set the value before building if deploying elsewhere.
 - **WebSocket service:** `API_BASE_URL` is required in production and should point to the local API, such as `http://127.0.0.1:3000`; development defaults to that address. `WS_ALLOWED_ORIGIN` is required in production and must match the browser's HTTPS origin. `WS_HOST` defaults to `127.0.0.1`. `FLATTRADE_WS_PORT` and `SHOONYA_WS_PORT` set the broker stream ports, defaulting to `8765` and `8766`; if changed, configure the same values in the API and update the reverse proxy and frontend URLs to match.
-- **Broker sessions:** In production, set `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` only in the API's protected server environment. The API saves new Flattrade sessions in a private SQLite database and restores them after restart until 6:00 AM India time. Existing memory-only sessions must be renewed after this feature is deployed. Flattrade may invalidate a session earlier. Tokens are not encrypted at rest; protect the database and backups. Flattrade's login URL necessarily includes the app key as required by its protocol. On first production load, the browser removes previously saved broker API keys, secrets and tokens from its local storage; configure them on the server first. Shoonya is unavailable in production until its login is migrated. Development retains the legacy browser-managed flow and must be kept private.
+- **Local Flattrade account:** To use server-managed Flattrade credentials during development, fill `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` in the ignored root `.env` file. Keep all three set together; partial configuration stops the API and frontend from starting. Restrict access to `.env` on your machine and never commit or share it. Restart the services, then use **Manage Brokers → Generate Token** and complete Flattrade login. The broker is loaded from the server configuration; the session remains in API memory and must be refreshed after an API restart. Set `TRADING_ENABLED=true` in the local `.env` only when you intend to submit real orders. Local live trading is refused unless all three server-side credentials are configured. The server-managed path enforces NSE derivatives and one contract lot per order and disables Shoonya. Set the flag to `false` and restart the API to disable order placement.
+- **Production broker sessions:** Set `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` only in the API's protected server environment. The API saves new Flattrade sessions in a private SQLite database and restores them after restart until 6:00 AM India time. Existing memory-only sessions must be renewed after this feature is deployed. Flattrade may invalidate a session earlier. Tokens are not encrypted at rest; protect the database and backups. Flattrade's login URL necessarily includes the app key as required by its protocol. On first production load, the browser removes previously saved broker API keys, secrets and tokens from its local storage; configure them on the server first. Shoonya is unavailable in production until its login is migrated. Development without server credentials retains the legacy browser-managed flow and must be kept private.
 - **Internal credential handoff:** Set the same randomly generated `WEBSOCKET_INTERNAL_TOKEN` (32-256 URL-safe letters, digits, `_`, or `-`) in the API and WebSocket environments in production. Keep it in a protected environment file, never in the frontend or Git. Production's `API_BASE_URL` must be a loopback address. Without a token, development allows local credential access and must not be exposed to a network.
 
 Origin checks and the internal token are not user authentication. Do not expose these services to the internet as-is: access control and end-to-end testing are still required. The disabled trading gate does not protect credentials or existing broker orders.
