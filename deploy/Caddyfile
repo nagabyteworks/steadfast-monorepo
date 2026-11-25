@@ -8,10 +8,6 @@ trade.nagabyte.com {
 	}
 
 	route {
-		basic_auth {
-			import {$STEADFAST_AUTH_FILE:/etc/caddy/steadfast-auth}
-		}
-
 		handle /flattrade/redirect {
 			root * /opt/steadfast/steadfast-app/dist
 			try_files /index.html

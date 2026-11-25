@@ -11,7 +11,6 @@ WS="$ROOT/steadfast-websocket"
 API_ENV=/etc/steadfast/api.env
 WS_ENV=/etc/steadfast/websocket.env
 CADDYFILE=/etc/caddy/Caddyfile
-AUTH_FILE=/etc/caddy/steadfast-auth
 DOMAIN=trade.nagabyte.com
 API_URL=http://127.0.0.1:3001
 
@@ -482,32 +481,6 @@ if [ -f "$CADDYFILE" ]; then
 else
     fail "Active Caddyfile is missing"
 fi
-if grep -Eiq '^[[:space:]]*basic_auth([[:space:]]|\{)|^[[:space:]]*basicauth([[:space:]]|\{)' "$CADDYFILE" 2>/dev/null; then
-    pass "Active Caddy configuration contains a Basic Auth directive"
-else
-    fail "Active Caddy configuration does not enforce Basic Auth"
-fi
-if [ -f "$AUTH_FILE" ]; then
-    auth_metadata="$(stat -c '%a:%U:%G' "$AUTH_FILE" 2>/dev/null || true)"
-    auth_hash_count="$(awk 'NF == 2 && $2 ~ /^\$2[aby]\$/ { n++ } END { print n+0 }' "$AUTH_FILE" 2>/dev/null)"
-    caddy_user="$(systemctl show caddy.service -p User --value 2>/dev/null || true)"
-    caddy_group="$(systemctl show caddy.service -p Group --value 2>/dev/null || true)"
-    auth_readable=0
-    if [ -n "$caddy_user" ] && [ "$(id -u)" -eq 0 ] && command -v runuser >/dev/null 2>&1; then
-        if runuser -u "$caddy_user" -- test -r "$AUTH_FILE"; then
-            auth_readable=1
-        fi
-    elif [ -r "$AUTH_FILE" ]; then
-        auth_readable=1
-    fi
-    if [ "$auth_metadata" = "640:root:$caddy_group" ] && [ "$auth_hash_count" -gt 0 ] && [ "$auth_readable" -eq 1 ]; then
-        pass "Basic Auth file has restricted permissions and bcrypt entries"
-    else
-        fail "Basic Auth file permissions or hashed-entry format are invalid"
-    fi
-else
-    fail "Basic Auth credential file is missing"
-fi
 if grep -Eiq 'remote_ip|client_ip|@untrusted' "$CADDYFILE" 2>/dev/null; then
     fail "Active Caddy configuration contains an IP allowlist"
 else
@@ -564,25 +537,13 @@ if [ "$https_status" != "000" ]; then
 else
     fail "HTTPS connection or certificate verification failed"
 fi
-if [ "$https_status" = "401" ]; then
-    pass "Unauthenticated public request is rejected by Basic Auth"
+if [ "$https_status" = "200" ]; then
+    pass "Public SPA is served without authentication (HTTP 200)"
 else
-    fail "Unauthenticated public request expected HTTP 401 but returned $https_status"
-fi
-warn "Authenticated public request was not attempted; credentials are not read or supplied by diagnostics"
-spa_status="$(http_status "https://$DOMAIN/manage-brokers")"
-if [ "$spa_status" = "401" ]; then
-    pass "Public SPA route is behind the expected Basic Auth gate"
-else
-    fail "Unauthenticated SPA route expected HTTP 401 but returned $spa_status"
+    fail "Public SPA expected HTTP 200 but returned $https_status"
 fi
 public_api_status="$(http_status "https://$DOMAIN/flattrade/account")"
-if [ "$public_api_status" = "401" ]; then
-    pass "Public API route is behind the expected Basic Auth gate"
-else
-    fail "Unauthenticated public API route expected HTTP 401 but returned $public_api_status"
-fi
-warn "Authenticated frontend asset and API proxy behavior was not tested without credentials"
+printf 'Public API route status: HTTP %s\n' "$public_api_status"
 
 section "PYTHON AND IPC"
 if [ -x "$WS/.venv/bin/python" ]; then

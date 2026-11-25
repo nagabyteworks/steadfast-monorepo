@@ -9,30 +9,22 @@ changing the public Caddy route does not require stopping or deleting them.
 
 | Component | Address or path |
 | --- | --- |
-| HTTPS and authenticated WebSocket | `trade.nagabyte.com`, Caddy ports 80/443 |
+| HTTPS and WebSocket | `trade.nagabyte.com`, Caddy ports 80/443 |
 | API | `127.0.0.1:3001` |
 | Flattrade WebSocket | `127.0.0.1:8765` |
 | WebSocket selector | `127.0.0.1:5000` |
 | Source and built frontend | `/opt/steadfast` |
 | API and WebSocket environment files | `/etc/steadfast/api.env`, `/etc/steadfast/websocket.env` |
-| Caddy Basic Auth account file | `/etc/caddy/steadfast-auth` |
 
 Port 3001 avoids the observed scalpX listener on port 3000. Recheck all ports on
 the instance before installation. Only Caddy should be exposed publicly; keep
 the API, WebSocket, and selector bound to loopback.
 
-The Caddy configuration requires HTTP Basic authentication on every route,
-including the WebSocket and callback, and does not restrict clients by IP
-address. This allows access from different networks while keeping the API and
-broker listeners private on loopback.
-
-`STEADFAST_AUTH_FILE` defaults to `/etc/caddy/steadfast-auth`. That file must
-contain a Caddy Basic Auth username and a bcrypt password hash, not a plaintext
-password. Generate the hash with Caddy's `hash-password` command on the host;
-use a unique strong password, and restrict file access to Caddy and
-administrators. Validate the configuration using the same environment as the
-Caddy service, and verify that HTTP, WebSocket, and callback requests are
-authenticated before any public exposure.
+The Caddy configuration has no authentication and does not restrict clients by
+IP address, because there is a single user. Anyone who can reach
+`trade.nagabyte.com` can use the app and the connected Flattrade session, so
+keep the API, WebSocket, and selector bound to loopback and treat the URL as
+sensitive. Add Caddy `basic_auth` or an IP allowlist again if that changes.
 
 ## Service prerequisites
 
@@ -126,15 +118,15 @@ connectivity or successful trading.
    orders. Browser-based protection is not broker-side risk management.
 2. Test the services privately before changing Caddy; verify broker login and
    fresh market data without orders.
-3. Check DNS, TLS, the Flattrade portal's approved outbound IP, and the Basic
-   Auth and WebSocket behavior. Validate Caddy's configuration using its
+3. Check DNS, TLS, the Flattrade portal's approved outbound IP, and the
+   WebSocket behavior. Validate Caddy's configuration using its
    installed version and verify the systemd units on Ubuntu. The local Caddy
    syntax check does not establish compatibility with the server or prove
    access control end to end.
 4. Back up the current Caddy configuration and record the scalpX service state.
    After positions and orders are reviewed and cutover is explicitly approved,
    switch the site to the new configuration and reload Caddy. Verify TLS,
-   unauthorized rejection, authorized access, the callback, and streaming.
+   access, the callback, and streaming.
 5. If verification fails, restore the saved Caddy configuration and prior
    service state. Recheck broker positions and pending orders independently;
    rolling back a service does not cancel or reverse broker orders.
