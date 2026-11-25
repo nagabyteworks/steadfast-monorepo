@@ -19,13 +19,18 @@ die() {
     exit 1
 }
 
+trap 'echo "ERROR: Commit or push failed. Some repositories may already have been committed or pushed; inspect their state before retrying." >&2' ERR
+
 # Verify repository, branch, remote and Git identity.
 validate_repo() {
     local dir="$1"
     local branch
+    local top_level
 
-    git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1 ||
+    top_level="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null)" ||
         die "Not a Git repository: $dir"
+    [[ "$top_level" == "$dir" ]] ||
+        die "Repository is not initialized at $dir"
 
     branch="$(git -C "$dir" branch --show-current)"
 
@@ -42,55 +47,15 @@ validate_repo() {
         die "Git user.email is not configured in $dir"
 }
 
-# Display repository changes.
-show_changes() {
-    local dir="$1"
-
-    echo ""
-    echo "========================================"
-    echo "Repository: $dir"
-    echo "========================================"
-
-    git -C "$dir" status --short --branch
-    git -C "$dir" diff --stat
-    git -C "$dir" diff --cached --stat
-}
-
-# Stage, review, commit and push a repository.
+# Stage, commit and push a repository.
 commit_and_push() {
     local dir="$1"
-    local message
-    local answer
-
-    show_changes "$dir"
-
-    read -r -p "Stage and commit ALL changes in $dir? [y/N]: " answer
-
-    [[ "$answer" == "y" || "$answer" == "Y" ]] ||
-        die "Cancelled by user."
 
     # Stage modified, deleted and untracked files.
     git -C "$dir" add -A
 
-    echo ""
-    echo "Files staged for commit:"
-    git -C "$dir" status --short
-
-    echo ""
-    git -C "$dir" diff --cached --stat
-
-    # Review the actual staged changes before committing.
-    git -C "$dir" diff --cached
-
     if ! git -C "$dir" diff --cached --quiet; then
-
-        read -r -p "Commit message for $dir: " message
-
-        [[ -n "$message" ]] ||
-            die "Commit message cannot be empty."
-
-        git -C "$dir" commit -m "$message"
-
+        git -C "$dir" commit --quiet -m "$message"
     else
         echo "No changes to commit in $dir."
     fi
@@ -126,6 +91,12 @@ done
 echo ""
 echo "Preflight validation successful."
 echo "All repositories are on main."
+echo "All modified, deleted and untracked files in these repositories will be staged."
+
+read -r -p "Commit message for all repositories: " message ||
+    die "Could not read commit message."
+[[ "$message" =~ [^[:space:]] ]] ||
+    die "Commit message cannot be empty."
 
 # Step 1: Commit and push submodules.
 for submodule in "${SUBMODULES[@]}"; do
@@ -134,55 +105,18 @@ for submodule in "${SUBMODULES[@]}"; do
 
 done
 
-# Step 2: Update parent repository submodule references.
+# Step 2: Commit and push parent repository with updated submodule references.
 echo ""
 echo "========================================"
 echo "UPDATING PARENT REPOSITORY"
 echo "========================================"
 
-show_changes "$ROOT"
-
-read -r -p "Stage and commit parent repository changes? [y/N]: " answer
-
-[[ "$answer" == "y" || "$answer" == "Y" ]] ||
-    die "Cancelled before parent repository commit."
-
-# Stage updated submodule references and other parent changes.
-git -C "$ROOT" add -A
-
-echo ""
-echo "Parent repository staged changes:"
-git -C "$ROOT" status --short
-git -C "$ROOT" diff --cached
-
-if ! git -C "$ROOT" diff --cached --quiet; then
-
-    read -r -p "Parent repository commit message: " message
-
-    [[ -n "$message" ]] ||
-        die "Commit message cannot be empty."
-
-    git -C "$ROOT" commit -m "$message"
-
-else
-    echo "No parent changes to commit."
-fi
-
-# Step 3: Push parent repository.
-git -C "$ROOT" push origin main:main
+commit_and_push "$ROOT"
 
 echo ""
 echo "========================================"
 echo "ALL REPOSITORIES PUSHED SUCCESSFULLY"
 echo "========================================"
-
-echo ""
-echo "Parent repository:"
-git -C "$ROOT" status --short --branch
-
-echo ""
-echo "Submodule revisions:"
-git -C "$ROOT" submodule status
 
 echo ""
 echo "IMPORTANT: No deployment or service restart was performed."

@@ -38,7 +38,12 @@ authenticated before any public exposure.
 
 - The working tree includes three Git submodules. Publish the appropriate
   child repository changes and update the parent submodule references before
-  cloning; do not assume local uncommitted changes exist on EC2.
+  cloning; do not assume local uncommitted changes exist on EC2. To publish
+  from a checkout on `main`, `./git-commit-push.sh` asks for one commit
+  message, stages all changes (including untracked files), then commits and
+  pushes each submodule followed by the parent. Repositories without changes
+  are still pushed. It does not show diffs or deploy; inspect changes first if
+  needed. A failure can leave earlier repositories committed or pushed.
 - Install Node.js 22.13 or newer and a compatible system-wide Python, create the
   `steadfast` service user, install the dependencies, and build the frontend.
   The units use `/usr/bin/env node`; Node must be on systemd's service PATH and
