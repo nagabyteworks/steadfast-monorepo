@@ -118,18 +118,20 @@ The service-specific commands are also available. Run each from the repository r
 ```bash
 cd steadfast-api && npm run dev
 cd steadfast-app && npm run dev
-cd steadfast-websocket && ENV=development .venv/bin/python main.py
+cd steadfast-websocket && .venv/bin/python main.py
 ```
 
 For Windows, `start-all.bat` provides an interactive menu. The `start-all.sh` and `start-all.bat` stop functions terminate processes by name, including unrelated Node.js or Python processes; do not use them on a shared machine or an EC2 instance running other services. The interactive `setup.sh` helper provides install, update, and run options on macOS/Linux. Review any helper before using its update option, which pulls changes in the child repositories.
 
 ## Configuration
 
-Configuration is service-specific:
+The repository root `.env` file controls the runtime profile for all three services. Set `profile=dev` for local development; if `profile=dev` is absent, the profile defaults to `prod`. The checked-in `.env.example` shows the local setting; copy it to `.env` when setting up a fresh checkout. The root `.env` is ignored by Git.
 
-- **API:** `NODE_ENV` must be `development` or `production`. `PORT` sets the API port (default `3000`), and `API_HOST` sets its listen address (default `127.0.0.1`, loopback required in production). `CORS_ORIGIN` sets the permitted browser origin; production requires an HTTPS origin and rejects state-changing requests without a matching `Origin` header. Development defaults to `http://localhost:5173`.
+Configuration is otherwise service-specific:
+
+- **API:** `PORT` sets the API port (default `3000`), and `API_HOST` sets its listen address (default `127.0.0.1`, loopback required in production). `CORS_ORIGIN` sets the permitted browser origin; production requires an HTTPS origin and rejects state-changing requests without a matching `Origin` header. Development defaults to `http://localhost:5173`.
 - **Frontend:** `VITE_BASE_URL` sets the API base URL and is used when deriving the production WebSocket URL. The production environment file defaults to `https://trade.nagabyte.com`. A production build requires an HTTPS origin without a path; set the value before building if deploying elsewhere.
-- **WebSocket service:** `ENV` must be `development` or `production`. `API_BASE_URL` is required in production and should point to the local API, such as `http://127.0.0.1:3000`; development defaults to that address. `WS_ALLOWED_ORIGIN` is required in production and must match the browser's HTTPS origin. `WS_HOST` defaults to `127.0.0.1`. `FLATTRADE_WS_PORT` and `SHOONYA_WS_PORT` set the broker stream ports, defaulting to `8765` and `8766`; if changed, configure the same values in the API and update the reverse proxy and frontend URLs to match.
+- **WebSocket service:** `API_BASE_URL` is required in production and should point to the local API, such as `http://127.0.0.1:3000`; development defaults to that address. `WS_ALLOWED_ORIGIN` is required in production and must match the browser's HTTPS origin. `WS_HOST` defaults to `127.0.0.1`. `FLATTRADE_WS_PORT` and `SHOONYA_WS_PORT` set the broker stream ports, defaulting to `8765` and `8766`; if changed, configure the same values in the API and update the reverse proxy and frontend URLs to match.
 - **Broker sessions:** In production, set `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` only in the API's protected server environment. The API saves new Flattrade sessions in a private SQLite database and restores them after restart until 6:00 AM India time. Existing memory-only sessions must be renewed after this feature is deployed. Flattrade may invalidate a session earlier. Tokens are not encrypted at rest; protect the database and backups. Flattrade's login URL necessarily includes the app key as required by its protocol. On first production load, the browser removes previously saved broker API keys, secrets and tokens from its local storage; configure them on the server first. Shoonya is unavailable in production until its login is migrated. Development retains the legacy browser-managed flow and must be kept private.
 - **Internal credential handoff:** Set the same randomly generated `WEBSOCKET_INTERNAL_TOKEN` (32-256 URL-safe letters, digits, `_`, or `-`) in the API and WebSocket environments in production. Keep it in a protected environment file, never in the frontend or Git. Production's `API_BASE_URL` must be a loopback address. Without a token, development allows local credential access and must not be exposed to a network.
 

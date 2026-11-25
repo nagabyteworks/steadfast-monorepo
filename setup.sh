@@ -157,7 +157,6 @@ run_services() {
 
     (
         cd steadfast-api
-        export NODE_ENV=development
         exec node server.js
     ) > api.log 2>&1 &
 
@@ -181,7 +180,6 @@ run_services() {
     (
         cd steadfast-websocket
         source .venv/bin/activate
-        export ENV=development
         exec python main.py
     ) > websocket.log 2>&1 &
 

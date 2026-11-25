@@ -6,7 +6,7 @@
     "start": "concurrently --names \"api,app,websocket\" --prefix-colors \"blue,green,magenta\" --kill-others-on-fail \"npm run api\" \"npm run app\" \"npm run websocket\"",
     "api": "npm run dev --prefix steadfast-api",
     "app": "npm run dev --prefix steadfast-app",
-    "websocket": "cd steadfast-websocket && ENV=development .venv/bin/python main.py",
+    "websocket": "cd steadfast-websocket && .venv/bin/python main.py",
     "install:all": "npm install --prefix steadfast-api && npm install --prefix steadfast-app && cd steadfast-websocket && python3 -m venv .venv && .venv/bin/python -m pip install -r requirements.txt"
   },
   "devDependencies": {
