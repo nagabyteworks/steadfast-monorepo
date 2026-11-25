@@ -66,17 +66,17 @@ authenticated before any public exposure.
   `https://trade.nagabyte.com/flattrade/redirect`, and the EC2 **outbound** IP
   against the broker's current configuration. An unexpired saved session can
   be restored after an API restart; Flattrade can still invalidate it earlier.
-  Login, logout, and expiry restart the streaming process, so the WebSocket
-  service must run under systemd.
+  Login and expiry restart the streaming process, so the WebSocket service must
+  run under systemd. Log in again after first deploying session persistence;
+  sessions created before deployment were held only in memory.
 - The API stores the session in a SQLite database under
   `/var/lib/steadfast-api`, protected by the API unit's private systemd state
   directory. Tokens are not encrypted at rest; restrict host and backup access.
-  The saved and in-memory session expire at 6:00 AM Asia/Kolkata, and local
-  logout deletes both. Logout does not revoke the session at Flattrade.
+  The saved and in-memory session expire at 6:00 AM Asia/Kolkata.
 - The production API systemd unit has `TRADING_ENABLED=true`, which permits
   live Flattrade order placement and cancellation after deployment. Set it to
   `false` and restart `steadfast-api.service` to disable those routes. Production
-  orders are limited to NFO and BFO derivatives and ten contract lots per order; this
+  orders are limited to NFO derivatives and one contract lot per order; this
   does not cap total exposure or daily loss.
 - Stop-loss/target automation is optional and browser-run, not broker-side.
   Keep the trading page open with its market-data connection active. If both
