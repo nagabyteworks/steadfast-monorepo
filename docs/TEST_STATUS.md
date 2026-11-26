@@ -3,6 +3,16 @@
 This is the latest **observed** test evidence for the current uncommitted
 working tree, not a production or end-to-end safety certification.
 
+## P&L charge breakdown: 2026-11-26
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run src/composables/usePnlCalculations.test.js` | 3 passed | Charge separation, Flattrade BSE options estimates, Shoonya per-order brokerage across partial fills, and net P&L arithmetic. |
+| `TRADING_ENABLED=false npm run build --prefix steadfast-app` | Passed | Production frontend build. Vite reports the existing large-chunk warning. |
+
+Displayed fees are estimates from turnover and TradeBook data, not broker
+contract-note values. No live broker requests, orders or deployment occurred.
+
 ## Three-second UI refresh and paired orders: 2026-11-26
 
 | Suite / command | Result | Scope |

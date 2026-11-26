@@ -59,6 +59,15 @@ Sell Both controls submit the selected CE then PE using the existing order
 handlers. For LMT orders, each leg has its own sequential price dialog; canceling
 the second dialog leaves the first submitted order unchanged.
 
+The P&L summary shows gross P&L, estimated tax (STT, stamp duty and GST), other
+exchange/regulatory charges, brokerage, total charges and net P&L. Net P&L is
+gross P&L less the displayed charge total; gross is the position-book realized
+P&L plus app-calculated unrealized P&L. Charges are estimates from turnover and
+trade-book fills, not broker-reported contract-note charges. Rates are based on
+the [Flattrade charges](https://flattrade.in/charges/) and
+[Shoonya pricing](https://shoonya.com/pricing) pages and may change; verify the
+broker contract note for final charges.
+
 ## Rule creation and persistence flow
 
 The app schedules default protection after an entry submission and position
