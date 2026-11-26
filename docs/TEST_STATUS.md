@@ -3,6 +3,42 @@
 This is the latest **observed** test evidence for the current uncommitted
 working tree, not a production or end-to-end safety certification.
 
+## Three-second UI refresh and paired orders: 2026-11-26
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run` | 81 passed | Full frontend suite, including sequential CE/PE limit-order progression and cancellation handling. |
+| `TRADING_ENABLED=false npm run build --prefix steadfast-app` | Passed | Production frontend build. Vite reports the existing large-chunk warning. |
+
+The app refreshes funds, orders, positions and risk rules every three seconds
+without reloading the page. Paired orders use the existing per-leg handlers;
+LMT orders prompt separately for CE and PE and stop after cancellation. Tests
+use mocks; no live broker requests, orders or deployment occurred.
+
+## Central reconciliation and status UX: 2026-11-26
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `TRADING_ENABLED=false npm test --prefix steadfast-api` | 68 passed | Full API suite, including 3-second scheduling, single-flight behavior, bulk multi-position reads, verified recovery, partial/uncertain exits, SQLite lease, status endpoints and mocked order handling. |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run` | 79 passed | Full frontend suite, including concise recovery notices, no reconciliation details in position rows, stale-cycle status handling, monitor selection, protection modes and automatic-sync messaging. |
+| `TRADING_ENABLED=false npm run build --prefix steadfast-app` | Passed | Production frontend build. Vite reports the existing large-chunk warning. |
+| `cd steadfast-websocket && TRADING_ENABLED=false PROFILE=dev .venv/bin/python -m unittest test_flattrade_lifecycle` | 12 passed | Mocked WebSocket lifecycle/reconnect tests, including the authenticated API reconciliation signal. |
+| Pylance file syntax check for `flattrade_websocket.py` | Passed | No Python syntax errors reported. |
+
+An initial API run exposed a null-prototype SQLite-row assertion mismatch; the
+test now compares its data fields. Intermediate frontend expectations still
+referenced the previous technical/manual-warning text and were updated to
+assert concise statuses. A stale-cycle test also verifies that old protection
+state is not presented as protected. Subsequent full runs passed. All broker responses were mocked;
+`TRADING_ENABLED=false` was used, and no live broker requests, orders or
+deployment occurred.
+
+These tests do not verify Flattrade rate limits or history retention, recovery
+on a separate host with an independent SQLite database, real-world order/fill
+semantics, missed LTP-trigger handling, bounded exit repricing or live trading
+safety. A position without verifiable lifecycle evidence remains
+`ACTION REQUIRED`; recovery evidence intake is not implemented.
+
 ## Restored UI risk controls: 2026-11-26
 
 | Suite / command | Result | Scope |

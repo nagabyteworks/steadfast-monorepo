@@ -1,426 +1,204 @@
-# Task: Fix Steadfast Trading – Simple BUY → Automatic Stop Loss / Target → SELL
+# Steadfast – Implement Application-Wide Automatic Reconciliation Every 3 Seconds
 
-You are working on the Steadfast trading platform, consisting of four repositories:
+## Objective
 
-1. https://github.com/nagabyteworks/steadfast-monorepo
-2. https://github.com/nagabyteworks/steadfast-app
-3. https://github.com/nagabyteworks/steadfast-api
-4. https://github.com/nagabyteworks/steadfast-websocket
+Implement a centralized, application-wide automatic reconciliation mechanism that synchronizes the entire Steadfast trading application's internal state with LIVE Flattrade broker state every 3 seconds.
 
-Your primary responsibility is to make the basic trading experience reliable, predictable, and extremely simple.
+I do not want manual reconciliation, manual protection verification or manual reactivation of suspended protection rules.
 
-## 1. Understand the actual product requirement
+The backend must continuously maintain accurate broker and application state.
 
-I want a simple options trading application.
+## 1. Central reconciliation scheduler
 
-As a user, I want to:
-
-1. Select an instrument.
-2. Enter quantity.
-3. Enable or disable Stop Loss.
-4. Enter Stop Loss points.
-5. Enable or disable Target.
-6. Enter Target points.
-7. Click BUY.
-8. Have the application automatically monitor the position.
-9. When Stop Loss or Target is reached, automatically SELL the open position.
-10. See the actual execution status.
-
-That's it.
-
-I do not want unnecessary configuration screens, technical options, complicated workflows, or multiple ways to manage the same position.
-
-The backend should handle the complexity.
-
-## 2. Mandatory first step: Audit all four repositories
-
-Before modifying anything:
-
-- Inspect the complete architecture.
-- Understand the existing application, API, WebSocket and broker integration.
-- Trace the complete BUY request lifecycle.
-- Trace how entry fills are identified.
-- Trace how default SL/target protection is created.
-- Trace how market prices reach the risk monitor.
-- Trace how SL/target triggers are evaluated.
-- Trace how automatic SELL orders are submitted.
-- Trace how order status and actual fills are reconciled.
-- Inspect existing tests and implementation-status documentation.
-- Identify duplicate implementations and conflicting responsibilities.
-
-Pay particular attention to:
-
-- `positionLifecycle.js`
-- `riskStore.js`
-- `routes/risk.js`
-- `routes/flattrade.js`
-- `useOrderManagement.js`
-- `useRiskManagement.js`
-- `useUiRiskTriggers.js`
-- `risk_monitor.py`
-
-Do not assume existing functionality works just because functions and tests exist.
-
-Identify the actual root causes of the existing SL/target failures.
-
-Do not replace the entire architecture unnecessarily. Reuse working code and make targeted improvements.
-
-## 3. Simplify the trading UI
-
-The normal trading screen should expose only:
-
-- Instrument
-- Quantity
-- BUY button
-- Stop Loss toggle
-- Stop Loss points
-- Target toggle
-- Target points
-
-Example:
-
-Instrument: NIFTY Option
-
-Quantity: 1 lot
-
-Stop Loss: ON
-Stop Loss: 20 points
-
-Target: ON
-Target: 30 points
-
-[ BUY ]
-
-The values above are illustrative.
+Implement one centralized reconciliation scheduler in the backend.
 
 Requirements:
 
-- Both SL and Target can be enabled independently.
-- Both can be disabled.
-- SL-only must work.
-- Target-only must work.
-- Both enabled must work.
-- Both disabled must not create automatic protection.
-- Do not expose internal monitoring architecture to ordinary users.
-- Remove unnecessary UI monitoring/server monitoring switches.
-- Remove unnecessary manual reconciliation workflows from the normal trading flow.
-- Keep advanced trailing functionality separate from the basic trading experience.
-- Do not break existing position visibility or manual SELL functionality.
+- Run reconciliation every 3 seconds during active trading.
+- Cover all active positions and relevant pending orders, not just the position currently visible in the UI.
+- Start an initial reconciliation when the backend starts.
+- Continue reconciling after WebSocket reconnects and broker API failures.
+- Reconcile immediately after important events such as BUY submission, SELL submission, order modification and cancellation, without waiting for the next scheduled cycle.
+- Do not create separate competing schedulers in the frontend, WebSocket service and API.
+- Ensure only one reconciliation cycle runs at a time.
+- Prevent overlapping executions when a previous cycle takes longer than 3 seconds.
+- Use a single-flight lock and appropriate distributed locking if multiple backend instances are possible.
+- Make the scheduler lifecycle safe during application shutdown and restart.
 
-Do not redesign unrelated application screens.
+## 2. Reconcile the entire application
 
-## 4. Make the backend the single execution authority
+Every reconciliation cycle must compare internal application state with Flattrade's actual state.
 
-The backend must own:
+Reconcile:
 
-- Entry order submission.
-- Entry fill reconciliation.
-- Position lifecycle.
-- Stop Loss and Target creation.
-- Risk monitoring coordination.
-- Exit order submission.
-- Exit fill reconciliation.
-- Remaining quantity tracking.
-- Duplicate-exit prevention.
-- Restart recovery.
-- Execution history.
+1. Broker positions.
+2. Open and pending orders.
+3. Completed orders.
+4. Trade book and execution fills.
+5. BUY order execution status.
+6. SELL order execution status.
+7. Partially filled orders.
+8. Remaining open quantities.
+9. Average entry and exit prices.
+10. SL and target rules.
+11. Suspended protection rules.
+12. Pending exit requests.
+13. Uncertain or timed-out broker requests.
+14. Internal position lifecycle state.
+15. Duplicate or conflicting orders.
 
-The WebSocket service should primarily provide market data and evaluate risk conditions if that responsibility remains in the existing design.
+Use broker endpoints efficiently. Prefer bulk retrieval and batch reconciliation instead of issuing unnecessary requests for each individual position.
 
-It must not independently submit broker orders.
+## 3. Automatic protection recovery
 
-The browser must not independently submit automatic exit orders.
+If an open position exists but its protection is missing, suspended or inconsistent:
 
-All automatic and manual exits must pass through one centralized backend exit service.
+- Automatically identify the actual open quantity.
+- Reconstruct the position's correct lifecycle.
+- Restore its valid SL and target rules.
+- Resume monitoring when the required state has been established.
+- Never require manual verification or manual reactivation during recoverable failures.
+- Never silently mark an unverified position as protected.
 
-There must never be competing execution authorities.
+For positions where protection parameters cannot be safely reconstructed, preserve the last valid protection configuration and raise an actionable internal recovery condition. Do not invent SL or target values.
 
-## 5. Implement the correct BUY lifecycle
+## 4. Automatic exit execution
 
-When the user clicks BUY:
+When SL or target triggers:
 
-1. Validate instrument, quantity and protection settings.
-2. Validate broker session and live trading readiness.
-3. Submit the actual LIVE BUY order.
-4. Record the broker order ID.
-5. Reconcile the order until its actual filled quantity is known.
-6. Do not create protection for unfilled quantity.
-7. Create protection using the actual average entry fill price.
-8. For partial entry fills, protect the confirmed filled quantity.
-9. Continue reconciling any outstanding entry quantity.
-10. Return accurate position and protection status to the application.
+- Automatically submit a LIVE SELL order.
+- Use the actual remaining broker position quantity.
+- Ensure only one active exit operation exists for a position.
+- Handle partial fills.
+- Reconcile uncertain requests before retrying.
+- Never create duplicate SELL orders.
+- Mark CLOSED only after broker reconciliation confirms the position is flat.
 
-Never treat an order acknowledgement as proof of a fill.
+The reconciliation scheduler must also discover positions whose exit should have occurred but whose exit request failed or was left unresolved.
 
-Never calculate SL/target from an assumed entry price when actual execution data is available.
+## 5. Real-time risk monitoring must remain independent
 
-## 6. Implement reliable fixed Stop Loss and Target
+Do not replace real-time LTP monitoring with 3-second reconciliation.
 
-For a LONG options position:
+- WebSocket market data remains responsible for real-time price updates.
+- The risk engine evaluates SL and target triggers using live market data.
+- The centralized backend execution service remains the sole authority for broker order submission.
+- Reconciliation independently verifies that the resulting broker state matches the expected state.
 
-- SL price = actual average entry price - SL points.
-- Target price = actual average entry price + Target points.
+There must be no competing exit execution authorities.
 
-For a SHORT position, reverse the calculations appropriately.
+## 6. Failure handling
 
-Requirements:
+Handle:
 
-- Validate positive prices.
-- Validate instrument tick sizes.
-- Validate price precision.
-- Handle market-price updates correctly.
-- Handle missing, zero, invalid and stale LTP.
-- Handle WebSocket disconnections.
-- Avoid duplicate triggers.
-- Trigger SL and Target independently.
-- Ensure a crossed threshold cannot be silently ignored.
-- Persist the protection configuration and its lifecycle state.
+- Flattrade API timeouts.
+- Network disconnections.
+- Authentication/session expiry.
+- Rate limits.
+- Broker errors.
+- Partial execution.
+- Missing or stale market data.
+- Backend restarts.
+- WebSocket reconnects.
+- Conflicting broker and application state.
 
-The trigger must use the correct position direction and actual instrument.
+Use bounded retries, backoff where appropriate, request timeouts and circuit-breaker protection.
 
-Do not accidentally apply equity-style assumptions to options positions.
+The scheduler must continue attempting reconciliation every 3 seconds without allowing overlapping requests or violating broker API limits. If the broker imposes rate limits, batch requests and coordinate API calls centrally.
 
-## 7. Implement reliable automatic SELL
+A failed cycle must not permanently stop future reconciliation cycles.
 
-When SL or Target triggers:
+## 7. Monitoring and observability
 
-1. Atomically claim the position's exit lifecycle.
-2. Prevent other automatic or manual exit workflows from submitting duplicate orders.
-3. Fetch the latest broker position.
-4. Verify the actual remaining open quantity.
-5. Submit a LIVE SELL order for that quantity.
-6. Record the broker order ID.
-7. Reconcile the actual order status and fills.
-8. Handle partial fills.
-9. If quantity remains open, continue the controlled exit process.
-10. Mark the position CLOSED only after the broker confirms that the position is flat.
+Record:
 
-Never mark an exit as successful merely because Flattrade returned `stat: "Ok"`.
+- Reconciliation cycle ID.
+- Start and completion timestamps.
+- Duration.
+- Broker API calls and response status.
+- Number of positions checked.
+- Number of orders checked.
+- Number of discrepancies found.
+- Number of discrepancies automatically repaired.
+- Number of positions requiring further recovery.
+- Last successful reconciliation timestamp.
 
-An accepted order is not necessarily an executed order.
+Expose a backend health/status endpoint showing:
 
-Implement appropriate handling for:
+- Scheduler running status.
+- Last successful reconciliation.
+- Last attempted reconciliation.
+- Current reconciliation status.
+- Active position count.
+- Unresolved reconciliation count.
 
-- Order rejection.
-- Broker timeout.
-- Unknown execution status.
-- Partial fills.
-- Cancellation.
-- Replacement orders.
-- Network failure.
-- Duplicate requests.
-- Manual SELL during automatic exit.
+The UI should show simple statuses, not technical reconciliation logs.
 
-Do not blindly retry an order after a timeout. First reconcile the original order to determine whether it was accepted or executed.
+## 8. Performance and reliability
 
-Respect Flattrade API restrictions and supported order types. Use valid tick sizes, price bands and fresh market depth when calculating marketable limit prices.
+- Do not allow a slow reconciliation cycle to block order placement or real-time risk monitoring.
+- Avoid unnecessary database writes when nothing has changed.
+- Use atomic updates and idempotency.
+- Protect against concurrent modifications by order-management and risk-management services.
+- Support application restarts and multiple backend instances safely.
+- Ensure one authoritative state per position.
 
-## 8. Centralize position lifecycle and concurrency
+## 9. User experience
 
-Implement a durable position-level state machine.
+Remove routine manual reconciliation workflows.
 
-Suggested states:
+Users should not need to:
+- Click Verify with Flattrade.
+- Manually reactivate protection.
+- Manually reconcile positions.
+- Refresh the app to synchronize broker state.
 
-- ENTRY_PENDING
-- ENTRY_PARTIALLY_FILLED
-- OPEN
-- EXIT_PENDING
-- EXIT_PARTIALLY_FILLED
-- EXIT_UNCERTAIN
-- CLOSED
-- ENTRY_FAILED
-- RECONCILIATION_REQUIRED
-
-Requirements:
-
-- Use stable position/lifecycle identifiers.
-- Do not rely exclusively on trading symbols as unique position identities.
-- Use atomic state transitions.
-- Implement database-backed duplicate-exit protection.
-- Make exit requests idempotent.
-- Maintain actual remaining quantities.
-- Preserve execution and state-transition history.
-- Handle concurrent WebSocket events and manual actions safely.
-
-## 9. Restart and recovery
-
-This is mandatory.
-
-If the API or WebSocket service restarts:
-
-- Reconnect to the broker.
-- Retrieve actual open positions.
-- Retrieve outstanding orders.
-- Retrieve relevant order history and trade history.
-- Reconcile pending entries and exits.
-- Restore valid SL/target rules.
-- Resume monitoring only after successful reconciliation.
-- Detect positions without protection.
-- Detect outstanding exits that may already have filled.
-- Never submit a duplicate exit during recovery.
-
-Do not silently suspend protection and leave the user with no practical recovery path.
-
-If recovery cannot establish a safe state, clearly report RECONCILIATION_REQUIRED and do not pretend the position is protected.
-
-## 10. Simplify position status
-
-The application should show only meaningful user-facing states:
-
-- ENTRY PENDING
+Show only:
 - OPEN – PROTECTED
-- OPEN – UNPROTECTED
+- OPEN – RECOVERING
 - EXITING
 - EXIT PARTIALLY FILLED
 - CLOSED
 - ACTION REQUIRED
 
-Show:
+Only show ACTION REQUIRED when automatic recovery genuinely cannot safely resolve the state.
 
-- Entry price
-- Current LTP
-- Quantity
-- Remaining quantity
-- Stop Loss price
-- Target price
-- Exit reason
-- Actual exit price
-- Actual realized P&L
+## 10. Testing and acceptance criteria
 
-Show accurate broker-confirmed execution status.
+Use mocked Flattrade responses for all automated tests. Never submit real-money orders during development or testing.
 
-Do not show misleading success notifications.
+Verify:
 
-## 11. LIVE TRADING ONLY
+- Scheduler executes at the configured 3-second interval.
+- No overlapping cycles occur.
+- Multiple open positions are reconciled.
+- Pending orders and partial fills are reconciled.
+- Missing protection is automatically recovered.
+- A failed cycle does not stop future cycles.
+- Backend restart restores reconciliation.
+- WebSocket reconnect triggers immediate reconciliation.
+- Duplicate SELL orders are prevented.
+- An uncertain SELL request is resolved before another SELL is submitted.
+- SL and target continue triggering through real-time market data.
+- No simulated or paper trading mode is introduced.
 
-I explicitly do not want paper trading or simulated production orders.
+## Implementation instructions
 
-Requirements:
+First inspect the existing architecture across all four repositories:
 
-- Use the actual Flattrade LIVE integration.
-- Do not silently fall back to PAPER or SIMULATION mode.
-- Do not create fake broker responses.
-- Do not simulate successful BUY or SELL executions.
-- Fail closed when live broker readiness cannot be established.
-- Validate broker session and trading permissions before submitting orders.
-- Do not change existing production trading configuration without understanding and preserving the agreed live-trading setup.
+- steadfast-monorepo
+- steadfast-api
+- steadfast-websocket
+- steadfast-app
 
-For automated tests, use mocked broker responses and test fixtures. These must never be connected to real order submission.
+Identify existing reconciliation logic and reuse or refactor it instead of creating duplicate mechanisms.
 
-Never place real orders during development or testing.
+Implement this as a centralized backend service with clear ownership, tests, structured logging and documentation.
 
-## 12. Mandatory automated test cases
+Do not simply add a setInterval() call that repeatedly invokes existing reconciliation endpoints.
 
-Implement integration and unit tests for all of the following:
+Do not hide errors or falsely report successful reconciliation.
 
-1. BUY completely filled → SL triggered → SELL completely filled → CLOSED.
-2. BUY completely filled → Target triggered → SELL completely filled → CLOSED.
-3. SL enabled, Target disabled → SL works.
-4. Target enabled, SL disabled → Target works.
-5. Both enabled → whichever triggers first initiates the exit.
-6. Both disabled → no automatic exit.
-7. BUY partially filled → protection applies only to filled quantity.
-8. Additional BUY fills → protection quantity is updated safely.
-9. SELL partially filled → remaining quantity is tracked.
-10. SELL rejected → position remains open.
-11. SELL times out → original order reconciled before another submission.
-12. Duplicate SL events → only one exit workflow.
-13. Duplicate Target events → only one exit workflow.
-14. Manual SELL and automatic SL occur simultaneously → no duplicate orders.
-15. API restarts with an open position → protection is restored.
-16. API restarts with an outstanding SELL → original order is reconciled.
-17. WebSocket disconnects and reconnects → monitoring recovers safely.
-18. Invalid LTP → no invalid exit order.
-19. Stale market data → unsafe automatic execution is prevented and reported.
-20. Broker session expires → position is reported as requiring attention.
+Do not change the LIVE trading configuration, and never place actual broker orders during development or testing.
 
-Add regression tests for every root cause identified during the audit.
-
-## 13. Performance, security and reliability
-
-- Use bounded broker API requests and timeouts.
-- Implement controlled retry and backoff policies.
-- Avoid unnecessary position-book polling.
-- Avoid duplicate WebSocket subscriptions.
-- Use atomic database operations.
-- Protect internal API endpoints with authentication.
-- Validate all incoming market data and order requests.
-- Keep broker credentials and tokens out of logs.
-- Maintain structured execution logs.
-- Record every order attempt, broker response and fill.
-- Make monitoring health visible to the backend.
-
-Do not introduce unnecessary infrastructure or dependencies.
-
-## 14. Execution strategy
-
-Work in this order:
-
-PHASE 1: Audit and document actual root causes.
-
-PHASE 2: Fix the backend order lifecycle and broker reconciliation.
-
-PHASE 3: Implement centralized automatic and manual exit execution.
-
-PHASE 4: Fix fixed SL and Target monitoring.
-
-PHASE 5: Implement restart recovery and duplicate-exit protection.
-
-PHASE 6: Simplify the trading UI.
-
-PHASE 7: Add and execute comprehensive automated tests.
-
-PHASE 8: Update architecture documentation and implementation status.
-
-After each phase:
-
-- Run relevant tests.
-- Run linting and type checks where available.
-- Build the affected applications.
-- Fix regressions before proceeding.
-- Document modified files and remaining risks.
-
-Do not mark an incomplete feature as implemented or tested.
-
-## 15. Important restrictions
-
-- Do not rewrite everything without justification.
-- Do not add new trading features before fixing the basic workflow.
-- Do not introduce more user-facing configuration.
-- Do not use the browser as the authority for automated trading.
-- Do not mark broker-acknowledged orders as filled.
-- Do not silently ignore failed protection creation.
-- Do not mark positions closed without broker confirmation.
-- Do not remove safety mechanisms to make the UI appear simpler.
-- Do not deploy or enable real-money trading automatically.
-- Do not place real orders.
-
-If repository access is read-only, complete the audit and provide exact proposed changes rather than claiming that files were modified.
-
-## 16. Final deliverables
-
-When finished, provide:
-
-1. Root causes identified.
-2. Root causes fixed.
-3. Files changed in each repository.
-4. Updated architecture.
-5. BUY-to-SELL lifecycle explanation.
-6. Test cases implemented.
-7. Test execution results.
-8. Build and type-check results.
-9. Remaining limitations.
-10. Deployment instructions.
-11. Explicit confirmation that no real orders were placed.
-
-## FINAL SUCCESS CRITERION
-
-I should be able to open the application, select an option, enter quantity, optionally enable SL and Target, and click BUY.
-
-After the actual BUY fill, the backend should automatically protect the position.
-
-When SL or Target is hit, the backend should automatically execute SELL and reconcile the actual broker fills.
-
-I should not need to open another screen, manually activate protection, choose a monitoring mode, or manually trigger an exit.
-
-**The primary objective is not to build a more complicated trading platform. It is to make this simple trading workflow work correctly and reliably.**
+Deliver a summary of changed files, architecture, tests, remaining limitations and deployment requirements.
