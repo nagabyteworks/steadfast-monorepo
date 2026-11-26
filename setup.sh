@@ -8,9 +8,9 @@ API_PID=""
 APP_PID=""
 WS_PID=""
 
-APP_REPO="https://github.com/narenkram/steadfast-app.git"
-API_REPO="https://github.com/narenkram/steadfast-api.git"
-WS_REPO="https://github.com/narenkram/steadfast-websocket.git"
+APP_REPO="https://github.com/nagabyteworks/steadfast-app.git"
+API_REPO="https://github.com/nagabyteworks/steadfast-api.git"
+WS_REPO="https://github.com/nagabyteworks/steadfast-websocket.git"
 
 # Always execute from the directory containing this script.
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"

@@ -29,7 +29,7 @@ install() {
     echo "Checking app repository..."
     if [ ! -d "steadfast-app/.git" ]; then
         echo "Cloning app..."
-        git clone https://github.com/narenkram/steadfast-app.git
+        git clone https://github.com/nagabyteworks/steadfast-app.git
     else
         echo "App repository already exists, skipping clone..."
     fi
@@ -37,7 +37,7 @@ install() {
     echo "Checking API repository..."
     if [ ! -d "steadfast-api/.git" ]; then
         echo "Cloning API..."
-        git clone https://github.com/narenkram/steadfast-api.git
+        git clone https://github.com/nagabyteworks/steadfast-api.git
     else
         echo "API repository already exists, skipping clone..."
     fi
@@ -45,7 +45,7 @@ install() {
     echo "Checking WebSocket repository..."
     if [ ! -d "steadfast-websocket/.git" ]; then
         echo "Cloning WebSocket..."
-        git clone https://github.com/narenkram/steadfast-websocket.git
+        git clone https://github.com/nagabyteworks/steadfast-websocket.git
     else
         echo "WebSocket repository already exists, skipping clone..."
     fi
@@ -85,11 +85,11 @@ install() {
 # Function to update repositories and install dependencies
 update_and_run() {
     echo "Updating steadfast-monorepo..."
-    git pull https://github.com/narenkram/steadfast-monorepo main || { echo "Error updating steadfast-monorepo."; exit 1; }
+    git pull https://github.com/nagabyteworks/steadfast-monorepo main || { echo "Error updating steadfast-monorepo."; exit 1; }
 
     echo "Updating steadfast-app..."
     cd steadfast-app
-    git pull https://github.com/narenkram/steadfast-app main || { echo "Error updating steadfast-app."; exit 1; }
+    git pull https://github.com/nagabyteworks/steadfast-app main || { echo "Error updating steadfast-app."; exit 1; }
     echo "Installing app dependencies..."
     npm install
     npm audit fix
@@ -97,7 +97,7 @@ update_and_run() {
 
     echo "Updating steadfast-api..."
     cd steadfast-api
-    git pull https://github.com/narenkram/steadfast-api main || { echo "Error updating steadfast-api."; exit 1; }
+    git pull https://github.com/nagabyteworks/steadfast-api main || { echo "Error updating steadfast-api."; exit 1; }
     echo "Installing API dependencies..."
     npm install
     npm audit fix
@@ -105,7 +105,7 @@ update_and_run() {
 
     echo "Updating steadfast-websocket..."
     cd steadfast-websocket
-    git pull https://github.com/narenkram/steadfast-websocket main || { echo "Error updating steadfast-websocket."; exit 1; }
+    git pull https://github.com/nagabyteworks/steadfast-websocket main || { echo "Error updating steadfast-websocket."; exit 1; }
     
     # Activate virtual environment and install dependencies
     source venv/bin/activate

@@ -23,7 +23,7 @@ echo Cloning repositories...
 echo Checking app repository...
 if not exist "steadfast-app\.git" (
     echo Cloning app...
-    git clone https://github.com/narenkram/steadfast-app.git
+    git clone https://github.com/nagabyteworks/steadfast-app.git
 ) else (
     echo App repository already exists, skipping clone...
 )
@@ -31,7 +31,7 @@ if not exist "steadfast-app\.git" (
 echo Checking API repository...
 if not exist "steadfast-api\.git" (
     echo Cloning API...
-    git clone https://github.com/narenkram/steadfast-api.git
+    git clone https://github.com/nagabyteworks/steadfast-api.git
 ) else (
     echo API repository already exists, skipping clone...
 )
@@ -39,7 +39,7 @@ if not exist "steadfast-api\.git" (
 echo Checking WebSocket repository...
 if not exist "steadfast-websocket\.git" (
     echo Cloning WebSocket...
-    git clone https://github.com/narenkram/steadfast-websocket.git
+    git clone https://github.com/nagabyteworks/steadfast-websocket.git
 ) else (
     echo WebSocket repository already exists, skipping clone...
 )
@@ -88,7 +88,7 @@ goto menu
 :update_and_run
 REM Update the entire monorepo
 echo Updating steadfast-monorepo...
-git pull https://github.com/narenkram/steadfast-monorepo main
+git pull https://github.com/nagabyteworks/steadfast-monorepo main
 if !errorlevel! neq 0 (
     echo Error updating steadfast-monorepo.
     goto :error
@@ -97,7 +97,7 @@ if !errorlevel! neq 0 (
 REM Update steadfast-app
 echo Updating steadfast-app...
 cd steadfast-app
-git pull https://github.com/narenkram/steadfast-app main
+git pull https://github.com/nagabyteworks/steadfast-app main
 if !errorlevel! neq 0 (
     echo Error updating steadfast-app.
     goto :error
@@ -110,7 +110,7 @@ cd ..
 REM Update steadfast-api
 echo Updating steadfast-api...
 cd steadfast-api
-git pull https://github.com/narenkram/steadfast-api main
+git pull https://github.com/nagabyteworks/steadfast-api main
 if !errorlevel! neq 0 (
     echo Error updating steadfast-api.
     goto :error
@@ -123,7 +123,7 @@ cd ..
 REM Update steadfast-websocket
 echo Updating steadfast-websocket...
 cd steadfast-websocket
-git pull https://github.com/narenkram/steadfast-websocket main
+git pull https://github.com/nagabyteworks/steadfast-websocket main
 if !errorlevel! neq 0 (
     echo Error updating steadfast-websocket.
     goto :error

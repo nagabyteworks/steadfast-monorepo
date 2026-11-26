@@ -12,9 +12,9 @@ Stay updated by joining the [Steadfast Telegram channel](https://t.me/steadfasta
 
 | Project | Purpose | Main technology |
 | --- | --- | --- |
-| [`steadfast-app`](https://github.com/narenkram/steadfast-app) | Browser UI for broker setup and management, trading, settings, and parallel copy trading | Vue 3, Vue Router, Vite |
-| [`steadfast-api`](https://github.com/narenkram/steadfast-api) | HTTP API that connects the UI to broker APIs, handles order-related requests, provides symbol data, and offers virtual orders | Node.js, Express |
-| [`steadfast-websocket`](https://github.com/narenkram/steadfast-websocket) | Broker-specific Python clients that connect to Flattrade or Shoonya and stream live data | Python, `websockets` |
+| [`steadfast-app`](https://github.com/nagabyteworks/steadfast-app) | Browser UI for broker setup and management, trading, settings, and parallel copy trading | Vue 3, Vue Router, Vite |
+| [`steadfast-api`](https://github.com/nagabyteworks/steadfast-api) | HTTP API that connects the UI to broker APIs, handles order-related requests, provides symbol data, and offers virtual orders | Node.js, Express |
+| [`steadfast-websocket`](https://github.com/nagabyteworks/steadfast-websocket) | Broker-specific Python clients that connect to Flattrade or Shoonya and stream live data | Python, `websockets` |
 
 The root `package.json` includes commands to install and run the services together. Each service also has its own package/dependency files.
 
@@ -74,7 +74,7 @@ The optional Buy Both and Sell Both buttons submit separate CE and PE orders sim
 Clone the repository and enter its directory:
 
 ```bash
-git clone https://github.com/narenkram/steadfast-monorepo.git
+git clone https://github.com/nagabyteworks/steadfast-monorepo.git
 cd steadfast-monorepo
 ```
 
