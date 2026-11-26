@@ -10,7 +10,7 @@ Group=steadfast-api
 SupplementaryGroups=steadfast
 WorkingDirectory=/opt/steadfast/steadfast-api
 EnvironmentFile=/etc/steadfast/api.env
-ExecStart=/usr/bin/env NODE_ENV=production API_HOST=127.0.0.1 PORT=3001 CORS_ORIGIN=https://trade.nagabyte.com TRADING_ENABLED=true node server.js
+ExecStart=/usr/bin/env NODE_ENV=production API_HOST=127.0.0.1 PORT=3001 CORS_ORIGIN=https://trade.nagabyte.com TRADING_ENABLED=true DRY_RUN=false node server.js
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true
