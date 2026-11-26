@@ -68,17 +68,17 @@ sensitive. Add Caddy `basic_auth` or an IP allowlist again if that changes.
 - The production API systemd unit has `TRADING_ENABLED=true`, which permits
   live Flattrade order placement and cancellation after deployment. Set it to
   `false` and restart `steadfast-api.service` to disable those routes. Production
-  orders are limited to NFO derivatives and one contract lot per order; this
+  server-managed orders are limited to NFO/BFO index derivatives and 1–10
+  whole contract lots per order; this
   does not cap total exposure or daily loss.
-- Stop-loss/target automation is optional and browser-run, not broker-side.
-  Keep the trading page open with its market-data connection active. If both
-  UI toggles are off, orders have no automatic stop-loss or target; even when
-  enabled, a browser or network interruption can stop the monitoring. Verify
-  orders and positions directly with Flattrade.
-- Automatic exits require Web Locks and persist a per-symbol safety lock after
-  an attempted submission. Verify broker orders and positions before resetting
-  the lock in the trading page. Locks only coordinate tabs in the same browser;
-  other devices and broker-side actions are not coordinated.
+- Stop-loss/target rules are virtual, not broker-side. They may be monitored by
+  the WebSocket service or, when selected, the browser; browser monitoring
+  requires the page to remain open. Feed, service, network or broker failures
+  and unfilled exit orders can leave positions open. Verify orders and
+  positions directly with Flattrade.
+- Manual, browser and server exits do not share a durable position-level lock
+  or confirmed-fill reconciliation. Verify broker orders and positions after
+  any failed or uncertain submission.
 
 The included systemd units force production mode and loopback addresses.
 Shoonya and virtual trading are disabled in production. Legacy browser broker

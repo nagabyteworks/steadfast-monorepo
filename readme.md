@@ -13,7 +13,7 @@ Stay updated by joining the [Steadfast Telegram channel](https://t.me/steadfasta
 | Project | Purpose | Main technology |
 | --- | --- | --- |
 | [`steadfast-app`](https://github.com/nagabyteworks/steadfast-app) | Browser UI for broker setup and management, trading, settings, and parallel copy trading | Vue 3, Vue Router, Vite |
-| [`steadfast-api`](https://github.com/nagabyteworks/steadfast-api) | HTTP API that connects the UI to broker APIs, handles order-related requests, provides symbol data, and offers virtual orders | Node.js, Express |
+| [`steadfast-api`](https://github.com/nagabyteworks/steadfast-api) | HTTP API that connects the UI to broker APIs, handles order-related requests, and provides symbol data | Node.js, Express |
 | [`steadfast-websocket`](https://github.com/nagabyteworks/steadfast-websocket) | Broker-specific Python clients that connect to Flattrade or Shoonya and stream live data | Python, `websockets` |
 
 The root `package.json` includes commands to install and run the services together. Each service also has its own package/dependency files.
@@ -26,9 +26,10 @@ The root `package.json` includes commands to install and run the services togeth
 4. The Python service fetches the selected broker session details through the API and starts that broker's WebSocket client. Flattrade uses port **8765**; Shoonya uses **8766**. The service waits for a broker selection, so it does not necessarily start both broker streams at once.
 5. The frontend uses the API for broker and order operations and WebSockets for streaming data.
 
-The API's `/virtual` routes simulate order placement and provide order/trade lists. These virtual orders are held in memory and disappear when the API process restarts.
+The API rejects `/virtual` trading requests in all profiles; it does not simulate orders.
 
 For how stop-loss, target and trailing work (UI vs server triggers, logs, troubleshooting), see [docs/stoploss-target-trailing.md](docs/stoploss-target-trailing.md).
+For agreed trading requirements and current gaps, see [trading rules](docs/TRADING_RULES.md) and [implementation status](docs/IMPLEMENTATION_STATUS.md).
 
 ## Repository structure
 
@@ -59,15 +60,15 @@ steadfast-monorepo/
 Broker credentials and accounts are needed to use broker integrations. Do not commit credentials, session tokens, or other secrets.
 Each repository ignores local `.env` files and private-key files. Git ignore rules do not protect files that are already tracked or staged, including the existing frontend environment files and WebSocket `.env`; keep secrets out of those files and review staged files before committing.
 
-**Live trading:** Production Flattrade order placement and cancellation require `TRADING_ENABLED=true`; the production systemd unit enables this flag. Set it to `false` and restart the API service to disable trading. Production orders are restricted to NFO derivatives and the API rejects individual orders larger than one lot, using the Flattrade scrip master. This is a per-order cap, not a cap on total positions, order count, or daily loss.
+**Live trading:** Production Flattrade order placement and cancellation require `TRADING_ENABLED=true`; the checked-in production systemd unit enables this flag. The gate does not close positions or cancel existing broker orders. Server-managed orders are restricted to NFO/BFO index derivatives and 1–10 whole lots per order, using the Flattrade scrip master. This is not a cap on total positions, order count, or daily loss.
 
 **Server-side stop-loss/target:** Stop-loss, trailing stop-loss, target and target trailing rules are stored in `risk-rules.sqlite` (next to the Flattrade token database) and monitored by the WebSocket service, which asks the API to exit when a rule hits. Target trailing never exits at the target: each time the target is reached the stop-loss moves to it and the target advances by the trail points, until the stop-loss is hit. Trailing stop-loss and target trailing cannot be enabled together. Exits are live limit orders and need `TRADING_ENABLED=true`. Rules expire at the daily session cutoff.
 
-Predefined stop-loss and target controls are optional and default to off. When enabled, their point values are monitored by the browser and exit orders are submitted from the browser. The app must remain open with a working market-data connection; this is not broker-side protection and can stop working if the browser, network, or stream disconnects. If both controls are off, a live entry has no automatic stop-loss or target. Check order acknowledgements, positions, and any protective actions directly with Flattrade. Never commit or share broker credentials or session tokens.
+Predefined stop-loss, target and target trailing default to on for fresh browser storage; saved browser settings take precedence. Rules may be monitored by the server or, when selected, the browser. Neither mode provides exchange-side protection. Feed, backend, browser, network or broker failures and unfilled exit orders can leave positions open. Check orders and positions directly with Flattrade. Never commit or share broker credentials or session tokens.
 
-Automatic exits require browser Web Locks and use a persistent per-symbol safety lock to prevent retries after an accepted, rejected, or uncertain submission. Verify orders and positions in Flattrade before using the trading page's reset control. Locks coordinate tabs in the same browser only; they do not coordinate other browsers, devices, or manual broker orders.
+Automatic and manual exits do not yet share a durable position-level lock or confirmed-fill reconciliation. A broker acknowledgement does not establish that the position has closed. Verify uncertain orders and positions with Flattrade.
 
-The optional Buy Both and Sell Both buttons submit separate CE and PE orders simultaneously; either leg can fail or remain unfilled independently. They are unavailable for manual Limit orders. Product type and click sounds are configured in Settings. The kill switch and automatic overtrade protection have been removed.
+The optional Buy Both and Sell Both buttons submit separate CE and PE orders simultaneously; either leg can fail or remain unfilled independently. They are unavailable for manual Limit orders. Product type and click sounds are configured in Settings. The `TRADING_ENABLED` gate remains; no daily-loss limit is implemented.
 
 ## Clone and install
 
@@ -128,7 +129,7 @@ Run the Python install commands from `steadfast-websocket`. On Windows, use the 
    npm start
    ```
 
-4. Open **http://localhost:5173**, go to **Manage Brokers**, and select **Generate Token** for Flattrade. Complete the broker login in the popup, then select the broker in the application. The Python service connects after broker selection. The development session is kept in API memory, so log in again after an API restart.
+4. Open **http://localhost:5173**, go to **Manage Brokers**, and select **Generate Token** for Flattrade. Complete the broker login in the popup, then select the broker in the application. The Python service connects after broker selection. Server-managed sessions are stored in the API's private SQLite state and can be restored until expiry; the broker may invalidate them earlier.
 
 Use **Ctrl+C** in the terminal to stop the root command. If `profile=dev` is absent, the services default to production and require production configuration.
 
@@ -159,7 +160,7 @@ Configuration is otherwise service-specific:
 - **API:** `PORT` sets the API port (default `3000`), and `API_HOST` sets its listen address (default `127.0.0.1`, loopback required in production). `CORS_ORIGIN` sets the permitted browser origin; production requires an HTTPS origin and rejects state-changing requests without a matching `Origin` header. Development defaults to `http://localhost:5173`.
 - **Frontend:** `VITE_BASE_URL` sets the API base URL and is used when deriving the production WebSocket URL. The production environment file defaults to `https://trade.nagabyte.com`. A production build requires an HTTPS origin without a path; set the value before building if deploying elsewhere.
 - **WebSocket service:** `API_BASE_URL` is required in production and should point to the local API, such as `http://127.0.0.1:3000`; development defaults to that address. `WS_ALLOWED_ORIGIN` is required in production and must match the browser's HTTPS origin. `WS_HOST` defaults to `127.0.0.1`. `FLATTRADE_WS_PORT` and `SHOONYA_WS_PORT` set the broker stream ports, defaulting to `8765` and `8766`; if changed, configure the same values in the API and update the reverse proxy and frontend URLs to match.
-- **Local Flattrade account:** To use server-managed Flattrade credentials during development, fill `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` in the ignored root `.env` file. Keep all three set together; partial configuration stops the API and frontend from starting. Restrict access to `.env` on your machine and never commit or share it. Restart the services, then use **Manage Brokers → Generate Token** and complete Flattrade login. The broker is loaded from the server configuration; the session remains in API memory and must be refreshed after an API restart. Set `TRADING_ENABLED=true` in the local `.env` only when you intend to submit real orders. Local live trading is refused unless all three server-side credentials are configured. The server-managed path enforces NSE derivatives and one contract lot per order and disables Shoonya. Set the flag to `false` and restart the API to disable order placement.
+- **Local Flattrade account:** To use server-managed Flattrade credentials during development, fill `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` in the ignored root `.env` file. Keep all three set together; partial configuration stops the API and frontend from starting. Restrict access to `.env` on your machine and never commit or share it. Server-managed sessions are persisted in the API's private state directory until expiry and may be invalidated earlier by Flattrade. Local live trading requires complete server-side credentials. The server-managed path enforces NFO/BFO index derivatives and 1–10 whole lots per order and disables Shoonya. Do not change the live configuration without authorization.
 - **Production broker sessions:** Set `FLATTRADE_CLIENT_ID`, `FLATTRADE_API_KEY`, and `FLATTRADE_API_SECRET` only in the API's protected server environment. The API saves new Flattrade sessions in a private SQLite database and restores them after restart until 6:00 AM India time. Existing memory-only sessions must be renewed after this feature is deployed. Flattrade may invalidate a session earlier. Tokens are not encrypted at rest; protect the database and backups. Flattrade's login URL necessarily includes the app key as required by its protocol. On first production load, the browser removes previously saved broker API keys, secrets and tokens from its local storage; configure them on the server first. Shoonya is unavailable in production until its login is migrated. Development without server credentials retains the legacy browser-managed flow and must be kept private.
 - **Internal credential handoff:** Set the same randomly generated `WEBSOCKET_INTERNAL_TOKEN` (32-256 URL-safe letters, digits, `_`, or `-`) in the API and WebSocket environments in production. Keep it in a protected environment file, never in the frontend or Git. Production's `API_BASE_URL` must be a loopback address. Without a token, development allows local credential access and must not be exposed to a network.
 

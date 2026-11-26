@@ -1,0 +1,68 @@
+# Test status
+
+This is the latest **observed** test evidence for the current uncommitted
+working tree, not a production or end-to-end safety certification.
+
+## Stale-protection safety changes: 2026-11-26
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `TRADING_ENABLED=false npm test --prefix steadfast-api` | 53 passed | Mocked API suite, including startup suspension, timeouts, missing sessions, duplicate positions, reopen, partial exit, trigger races, UI trigger validation and refresh failures. Earlier runs passed 51/51 twice and 52/52. |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run` | 82 passed | Full frontend suite, including flagged SL/target triggers. Run twice successfully. |
+| `TRADING_ENABLED=false npm run test:risk:coverage --prefix steadfast-app` | 53 passed | Frontend risk modules: 95.29% statements/lines, 87.7% branches, 100% functions; each exceeds 70%. |
+| `TRADING_ENABLED=false node --test --experimental-test-coverage --test-coverage-include='**/riskStore.js' --test-coverage-include='**/routes/risk.js' --test-coverage-include='**/positionLifecycle.js' steadfast-api/test/riskStore.test.js steadfast-api/test/riskRoutes.test.js steadfast-api/test/positionLifecycle.test.js` | 31 passed | Final aggregate 90.14% lines, 87.73% branches, 96.61% functions; each file exceeds 70%. Previous runs passed 30 tests with 90.53%/87.94%/96.61% and 91.16%/87.77%/96.55%. |
+| `cd steadfast-websocket && TRADING_ENABLED=false PROFILE=dev .venv/bin/python -m unittest test_risk_monitor test_startup` | 27 passed | Selected mocked Python tests, including revision in trigger request. An earlier intermediate run passed 26 tests. |
+| Frontend production build | Passed twice | Isolated output, invalid example URL and trading disabled; Vite reported a chunk-size warning. |
+
+Intermediate targeted runs included API failures (18/22 and 25/26) and frontend
+failures (47/51) during the changes; those regressions were addressed in the
+passing full runs. A subsequent targeted run passed 25/25 API and 51/51
+frontend tests before further changes. Pylance syntax checks passed for the two
+changed Python files. No live broker responses or orders were used.
+
+These tests do not establish atomicity against external broker actions after
+the last snapshot, multi-process order submission, independently verified
+historical continuity, or a full WebSocket reconnect/recovery lifecycle.
+
+## Latest runs: 2026-11-26
+
+| Suite / command | Total | Passed | Failed | Skipped | Result and scope |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run src/composables/useRiskManagement.test.js src/composables/useDefaultProtectionLifecycle.test.js` | 33 | 32 | 1 | 0 | Intermediate failure: a new test was accidentally nested inside another test; fixed before the full run below. |
+| `TRADING_ENABLED=false node --test steadfast-api/test/positionLifecycle.test.js steadfast-api/test/riskRoutes.test.js` | 17 | 17 | 0 | 0 | Targeted mocked API reconstruction and manual-protection tests. |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run` | 80 | 80 | 0 | 0 | Latest Vitest frontend suite; includes the 12 first-fill lifecycle scenarios and the reconciliation notice. Earlier run: 79/79. |
+| `TRADING_ENABLED=false npm test --prefix steadfast-api` | 43 | 43 | 0 | 0 | Node API suite, including mocked broker lifecycle and risk routes. |
+| `cd steadfast-websocket && TRADING_ENABLED=false PROFILE=dev .venv/bin/python -m unittest test_risk_monitor test_startup` | 26 | 26 | 0 | 0 | Selected WebSocket risk-monitor and startup tests after the user's restoration; not a claim about all Python tests. |
+| `TRADING_ENABLED=false npm run test:risk:coverage --prefix steadfast-app` | 51 | 51 | 0 | 0 | Frontend risk tests; aggregate statements 95.29%, branches 87.5%, functions 100%, lines 95.29%. Each configured file exceeded 70%. |
+| `TRADING_ENABLED=false node --test --experimental-test-coverage --test-coverage-include='**/riskStore.js' --test-coverage-include='**/routes/risk.js' --test-coverage-include='**/positionLifecycle.js' steadfast-api/test/riskStore.test.js steadfast-api/test/riskRoutes.test.js steadfast-api/test/positionLifecycle.test.js` | 22 | 22 | 0 | 0 | API risk files: each exceeds 70% lines, branches and functions; latest aggregate 90.82%, 85.38%, 94.34%, respectively. The earlier run was 90.52%, 85.24%, 94.34%. |
+
+Frontend production build passed using `TRADING_ENABLED=false`, an invalid
+example API URL and an isolated session output directory. Vite reported a
+large-chunk warning; the generated output was removed after verification. The earlier targeted test failure was fixed and is covered
+by the passing full and coverage runs.
+
+Broker calls exercised by these tests were mocked; no real broker orders were
+placed. These runs do not establish end-to-end safety for live execution,
+partial fills, bounded repricing, historical carry-forward recovery or concurrency.
+The carry-forward test verifies persistence, idempotent rejection of missing
+history and continued blocking of rearming, not successful multi-day recovery.
+The API suite and coverage run were repeated after adding the rearming block.
+The frontend suite and build were repeated after adding the notice. Tests for
+verified evidence intake, contradictory documents and successful manual
+reconciliation are not implemented because no independent verification source
+or resolution workflow is implemented. Earlier
+reopen regressions failed because defaults used LTP/average and could reuse an
+old rule; those eight cases passed in the latest frontend run.
+
+## Earlier WebSocket run
+
+An earlier run on 2026-11-26 passed 36 selected WebSocket tests against a
+different working-tree version. The user subsequently restored the WebSocket
+files; that earlier result does not verify the restored code.
+
+## Documentation update
+
+On 2026-11-26 the documentation snapshot was added and contradictory guidance
+corrected. Following the restoration, the selected WebSocket suite was rerun
+with broker interactions mocked. No real broker interaction or order occurred
+during this documentation task.
