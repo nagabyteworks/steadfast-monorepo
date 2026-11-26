@@ -6,7 +6,7 @@ The [implementation status](IMPLEMENTATION_STATUS.md) identifies gaps.
 ## Components and trust boundaries
 
 - [Vue app](../steadfast-app/src/) displays positions and rules, submits entry
-  and manual-exit requests, and can optionally evaluate UI-monitored rules.
+  and manual-exit requests, and exposes no browser-side automatic monitor.
 - [Express API](../steadfast-api/server.js) manages Flattrade sessions,
   order routes and, in server-managed mode, risk routes. The production API
   binds to loopback; CORS/origin checks and the internal token are not user
@@ -68,21 +68,25 @@ any trusted verification source remain unimplemented.
 
 ## Monitoring and exits
 
-The monitor evaluates fixed SL/target and trailing modes from LTP; trailing
-progress and triggers are sent to the API with a revision. Browser triggers
-also go through the risk API, not the manual exit path. Before submission the
-API checks the stored revision and reconciliation flag, fetches position and
-trade snapshots, verifies the opening fill against the stored account,
-instrument and product identity, and checks the flag again. Manual exits
-remain separate. A broker acknowledgement is currently recorded as
-`done` without fill reconciliation. The app can alternatively monitor and
-request exits, and manual exits use the browser order path. These paths are
+The WebSocket risk monitor evaluates fixed SL/target and trailing modes from
+LTP; trailing progress and triggers are sent to the API with a revision.
+Browser-triggered automatic exits are disabled, and legacy UI-monitor rules
+are migrated to the server monitor. Before an automatic exit submission the API
+checks the stored revision and reconciliation flag, fetches position and trade
+snapshots, verifies the opening fill against the stored account, instrument
+and product identity, and checks the flag again. A successful PlaceOrder
+acknowledgement is now recorded as `exit_pending` with the broker order ID, not
+as a completed fill. Actual order/fill reconciliation is not yet implemented.
+On restart, pending exits are flagged for reconciliation rather than silently
+re-armed; no automatic recovery of their broker status is available yet.
+Manual exits still use the browser order path; automatic and manual exits are
 not serialized through a shared position-level exit service.
 
-The restored server monitor does not validate positive, finite LTP or reject
-nonpositive next trailing targets. A trailing increment that cannot advance
-after rounding can also prevent its milestone loop from terminating. The
-browser monitor has additional checks, but does not replace server-side safety.
+The server monitor and API reject nonpositive/non-finite prices; the API also
+checks that the trigger reason matches a crossed fixed rule. A target-trailing
+increment that cannot advance after rounding is logged and left unchanged.
+Market-data age is not currently propagated into triggers, so stale-price
+rejection is not established.
 
 Both current exit paths use a 2% LTP-based marketable-limit buffer with a
 fixed 0.05 tick. They do not implement the agreed fresh-depth, price-band and

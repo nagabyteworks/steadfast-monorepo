@@ -3,6 +3,28 @@
 This is the latest **observed** test evidence for the current uncommitted
 working tree, not a production or end-to-end safety certification.
 
+## Server-only risk and pending-exit safeguards: 2026-11-26
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `TRADING_ENABLED=false npm test --prefix steadfast-api` | 57 passed | API unit/integration suite, including trigger validation, browser-trigger rejection, legacy monitor migration, pending-exit startup flagging, lifecycle-race handling and missing order-ID handling. |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run` | 61 passed | Full frontend unit suite; covers fixed SL-only, target-only, both and neither, server-only protection, and preserving advanced settings on existing positions. |
+| `cd steadfast-websocket && TRADING_ENABLED=false PROFILE=dev python3 -m unittest test_risk_monitor` | 18 passed | WebSocket monitor tests for invalid prices and non-advancing target-trail increments. |
+| `TRADING_ENABLED=false npm run build --prefix steadfast-app` | Passed | Production frontend build; Vite reports an existing large-chunk warning. |
+| Pylance file syntax checks | Passed | `risk_monitor.py` and `flattrade_websocket.py`. |
+
+An intermediate frontend run failed because the new disabled-protection test
+was placed inside another test; it was moved and the complete suite passed.
+The first Python test invocation used the wrong working directory; the
+documented targeted command above ran successfully. Full Python test discovery
+was attempted but 20 tests could not import because `python-dotenv` is absent
+from the available interpreter. Targeted ESLint with the repository's legacy
+configuration reported 11 unused/undefined-symbol errors across affected
+files; lint is not clean, and no broad lint cleanup was attempted. All tests used fixtures/mocks,
+trading was disabled, and no real broker requests or orders were made. These
+results do not verify actual fills, order reconciliation, stale-market-data
+handling, shared manual/automatic exits or restart recovery.
+
 ## Stale-protection safety changes: 2026-11-26
 
 | Suite / command | Result | Scope |
