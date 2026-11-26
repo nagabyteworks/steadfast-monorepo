@@ -6,15 +6,18 @@ The [implementation status](IMPLEMENTATION_STATUS.md) identifies gaps.
 ## Components and trust boundaries
 
 - [Vue app](../steadfast-app/src/) displays positions and rules, submits entry
-  and manual-exit requests, and exposes no browser-side automatic monitor.
+  and manual-exit requests, and can optionally monitor risk rules while its
+  page is open. It sends trigger signals to the API; it does not submit
+  automatic broker exits itself.
 - [Express API](../steadfast-api/server.js) manages Flattrade sessions,
   order routes and, in server-managed mode, risk routes. The production API
   binds to loopback; CORS/origin checks and the internal token are not user
   authentication.
 - [Python WebSocket service](../steadfast-websocket/flattrade/flattrade_websocket.py)
   receives broker LTP updates and feeds the [risk monitor](../steadfast-websocket/risk_monitor.py).
-  Server-monitored rules are loaded from the API; progress and trigger requests
-  use internal endpoints.
+  Server-monitored rules are loaded from the API; UI-monitored rules are only
+  monitored in the open browser tab. Both paths send progress and trigger
+  requests to the API.
 - Flattrade is the live broker. The API rejects `/virtual`; legacy development
   can still expose Shoonya functionality.
 
@@ -68,13 +71,14 @@ any trusted verification source remain unimplemented.
 
 ## Monitoring and exits
 
-The WebSocket risk monitor evaluates fixed SL/target and trailing modes from
-LTP; trailing progress and triggers are sent to the API with a revision.
-Browser-triggered automatic exits are disabled, and legacy UI-monitor rules
-are migrated to the server monitor. Before an automatic exit submission the API
-checks the stored revision and reconciliation flag, fetches position and trade
-snapshots, verifies the opening fill against the stored account, instrument
-and product identity, and checks the flag again. A successful PlaceOrder
+The WebSocket risk monitor evaluates server-selected fixed SL/target and
+trailing modes from LTP. The optional UI monitor evaluates UI-selected rules
+using fresh per-position quotes while the page is open. Both paths send
+revision-checked progress and trigger requests to the API; the browser never
+submits an automatic broker exit. Before an automatic exit submission the API
+checks the stored monitor, revision and reconciliation flag, fetches position
+and trade snapshots, verifies the opening fill against the stored account,
+instrument and product identity, and checks the flag again. A successful PlaceOrder
 acknowledgement is now recorded as `exit_pending` with the broker order ID, not
 as a completed fill. Actual order/fill reconciliation is not yet implemented.
 On restart, pending exits are flagged for reconciliation rather than silently
@@ -83,10 +87,11 @@ Manual exits still use the browser order path; automatic and manual exits are
 not serialized through a shared position-level exit service.
 
 The server monitor and API reject nonpositive/non-finite prices; the API also
-checks that the trigger reason matches a crossed fixed rule. A target-trailing
-increment that cannot advance after rounding is logged and left unchanged.
-Market-data age is not currently propagated into triggers, so stale-price
-rejection is not established.
+checks that the trigger reason matches a crossed fixed rule. The UI monitor
+ignores missing, invalid or older-than-30-second per-position quotes. The API
+does not independently verify quote age, so server-side stale-price rejection
+is not established. A target-trailing increment that cannot advance after
+rounding is logged and left unchanged.
 
 Both current exit paths use a 2% LTP-based marketable-limit buffer with a
 fixed 0.05 tick. They do not implement the agreed fresh-depth, price-band and

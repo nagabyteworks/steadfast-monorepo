@@ -3,7 +3,21 @@
 This is the latest **observed** test evidence for the current uncommitted
 working tree, not a production or end-to-end safety certification.
 
-## Server-only risk and pending-exit safeguards: 2026-11-26
+## Restored UI risk controls: 2026-11-26
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `TRADING_ENABLED=false npm test --prefix steadfast-api` | 58 passed | Full API suite, including UI-monitor persistence, API-owned UI trigger execution and stale progress-revision rejection with mocked broker calls. |
+| `TRADING_ENABLED=false npm run test:unit --prefix steadfast-app -- --run` | 77 passed | Full frontend suite, including UI trigger freshness, SL/target/trailing behavior, monitor selection, warning placement and BUY/SELL Side colors. |
+| `TRADING_ENABLED=false npm run build --prefix steadfast-app` | Passed | Production frontend build; Vite reports the existing large-chunk warning. |
+
+Targeted ESLint using the repository's legacy configuration still reports
+errors in changed files, mainly existing unused imports/variables and undefined
+symbols in `useTradeView.js` and older tests. No live broker requests, orders or
+deployment occurred. These checks do not establish live fills, API quote-age
+validation, startup reconciliation or safe exit recovery.
+
+## Earlier server-only risk and pending-exit safeguards: 2026-11-26
 
 | Suite / command | Result | Scope |
 | --- | --- | --- |
