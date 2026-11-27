@@ -13,6 +13,8 @@ Group=steadfast-ws
 SupplementaryGroups=steadfast
 WorkingDirectory=/opt/steadfast/steadfast-websocket
 EnvironmentFile=/etc/steadfast/websocket.env
+ExecStartPre=/usr/bin/curl --fail --silent --show-error --output /dev/null --max-time 2 --retry 40 --retry-delay 2 --retry-connrefused http://127.0.0.1:3001/health
+TimeoutStartSec=150
 ExecStart=/usr/bin/env ENV=production API_BASE_URL=http://127.0.0.1:3001 WS_HOST=127.0.0.1 WS_ALLOWED_ORIGIN=https://trade.nagabyte.com PYTHONUNBUFFERED=1 /opt/steadfast/steadfast-websocket/.venv/bin/python main.py
 Restart=on-failure
 RestartSec=30

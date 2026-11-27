@@ -9,7 +9,8 @@ working tree, not a production or end-to-end safety certification.
 | --- | --- | --- |
 | `node --check steadfast-api/routes/flattrade.js` and `node --check steadfast-api/test/tradingGateRoutes.test.js` | Passed | JavaScript syntax for both modified API files. |
 | `TRADING_ENABLED=false npm test --prefix steadfast-api` | 72 passed | Full API suite; the new regression constructs the router with real temporary SQLite stores and verifies lot exit/trigger gates. It reproduced the reported initialization error before the fix. |
-| `cd steadfast-websocket && PROFILE=dev API_BASE_URL=http://127.0.0.1:3001 .venv/bin/python -m unittest test_startup test_flattrade_lifecycle` | 23 passed | Mocked WebSocket startup and reconnection behavior, not the production service. |
+| `cd steadfast-websocket && PROFILE=dev API_BASE_URL=http://127.0.0.1:3001 .venv/bin/python -m unittest test_startup test_flattrade_lifecycle test_risk_monitor` | 44 passed | Mocked WebSocket startup, reconnection, and session retrieval: API outage with exponential backoff and a single log line, recovery, HTTP/missing/invalid session categories and expired-session replacement. `test_config` (12 passed) must run without `PROFILE=dev`. |
+| API smoke test | Passed | Server-managed development mode with fake credentials, temporary state directory and `TRADING_ENABLED=false`: route registration succeeded, `/health` and `/flattrade/lots` returned 200. No real database or broker was used. |
 
 No deployment or production restart was performed; production logs, API health,
 WebSocket listener and broker session restoration were not accessible or
