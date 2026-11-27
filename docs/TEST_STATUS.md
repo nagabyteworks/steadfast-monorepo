@@ -3,6 +3,20 @@
 This is the latest **observed** test evidence for the current uncommitted
 working tree, not a production or end-to-end safety certification.
 
+## API startup middleware ordering
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `node --check steadfast-api/routes/flattrade.js` and `node --check steadfast-api/test/tradingGateRoutes.test.js` | Passed | JavaScript syntax for both modified API files. |
+| `TRADING_ENABLED=false npm test --prefix steadfast-api` | 72 passed | Full API suite; the new regression constructs the router with real temporary SQLite stores and verifies lot exit/trigger gates. It reproduced the reported initialization error before the fix. |
+| `cd steadfast-websocket && PROFILE=dev API_BASE_URL=http://127.0.0.1:3001 .venv/bin/python -m unittest test_startup test_flattrade_lifecycle` | 23 passed | Mocked WebSocket startup and reconnection behavior, not the production service. |
+
+No deployment or production restart was performed; production logs, API health,
+WebSocket listener and broker session restoration were not accessible or
+verified. These tests do not establish live trading safety. In particular,
+the existing lot trigger callback references an undeclared `sign` when
+evaluating a supplied trigger price.
+
 ## Lot-level positions snapshot: 2026-11-27
 
 | Suite / command | Result | Scope |
