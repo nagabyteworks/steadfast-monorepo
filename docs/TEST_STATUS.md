@@ -3,6 +3,18 @@
 This is the latest **observed** test evidence for the current uncommitted
 working tree, not a production or end-to-end safety certification.
 
+## Lot-level positions snapshot: 2026-11-27
+
+| Suite / command | Result | Scope |
+| --- | --- | --- |
+| `npm run test --prefix steadfast-api` | 69 passed | Full API suite, including persisted lot-ledger allocation and restart restoration. |
+| `npm run test:unit --prefix steadfast-app -- --run src/components/PositionsTableComponent.test.js` | 2 passed | Positions table reconciliation UX and three-lot expandable rendering. |
+| `npm run build --prefix steadfast-app` | Passed | Production frontend build; Vite reports the existing large-chunk warning. |
+
+Lot allocation is derived from available broker TradeBook fills and is not a
+broker-confirmed per-lot position identity. No live broker requests or orders
+were made in these runs.
+
 ## P&L charge breakdown: 2026-11-26
 
 | Suite / command | Result | Scope |

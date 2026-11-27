@@ -1,204 +1,333 @@
-# Steadfast – Implement Application-Wide Automatic Reconciliation Every 3 Seconds
+# Feature: Lot-Level Expandable Positions with Independent SL and Target Management
 
-## Objective
+Implement a lot-level expandable/collapsible Positions table in scalpX.
 
-Implement a centralized, application-wide automatic reconciliation mechanism that synchronizes the entire Steadfast trading application's internal state with LIVE Flattrade broker state every 3 seconds.
+## 1. Objective
 
-I do not want manual reconciliation, manual protection verification or manual reactivation of suspended protection rules.
+Currently, the Positions table displays aggregated positions grouped by trading symbol.
 
-The backend must continuously maintain accurate broker and application state.
+I want each symbol to have an expandable accordion/subtable that displays its individual lots separately.
 
-## 1. Central reconciliation scheduler
+For example:
 
-Implement one centralized reconciliation scheduler in the backend.
+NIFTY 26DEC01 CALL 26200 — 3 Lots
 
-Requirements:
+When expanded, display:
 
-- Run reconciliation every 3 seconds during active trading.
-- Cover all active positions and relevant pending orders, not just the position currently visible in the UI.
-- Start an initial reconciliation when the backend starts.
-- Continue reconciling after WebSocket reconnects and broker API failures.
-- Reconcile immediately after important events such as BUY submission, SELL submission, order modification and cancellation, without waiting for the next scheduled cycle.
-- Do not create separate competing schedulers in the frontend, WebSocket service and API.
-- Ensure only one reconciliation cycle runs at a time.
-- Prevent overlapping executions when a previous cycle takes longer than 3 seconds.
-- Use a single-flight lock and appropriate distributed locking if multiple backend instances are possible.
-- Make the scheduler lifecycle safe during application shutdown and restart.
+- Lot 1
+- Lot 2
+- Lot 3
 
-## 2. Reconcile the entire application
+Each lot must have independent Stop Loss, Target, Trailing Stop Loss, P&L tracking, and Exit functionality.
 
-Every reconciliation cycle must compare internal application state with Flattrade's actual state.
+This is a functional trading feature, not just a UI change.
+
+## 2. UI Requirements
+
+### A. Parent Symbol Row
+
+Preserve the existing Positions table and its current columns, styling, colors, spacing, and dark theme.
+
+Do not redesign the entire trading dashboard.
+
+Add an expand/collapse control beside each symbol.
+
+The parent row must continue displaying aggregated symbol-level information:
+
+- Select
+- Symbol
+- Qty
+- Side
+- TSL / SL
+- LTP
+- Target
+- Type
+- B.Avg
+- S.Avg
+- Realized
+- Unrealized
+- Exit
+
+The parent row should display aggregated values across all its lots.
+
+For SL and Target, display an appropriate indicator such as "Mixed" when individual lots have different values. Allow users to expand the row to inspect individual configurations.
+
+### B. Expanded Lot Rows
+
+When the user expands a symbol, render its individual lots underneath the parent row.
+
+Each child row must use the same columns as the existing Positions table.
+
+Example:
+
+Parent:
+NIFTY 26DEC01 CALL 26200 | Qty: 3
+
+Children:
+
+Lot 1 | Qty: 1
+Lot 2 | Qty: 1
+Lot 3 | Qty: 1
+
+Each lot must display:
+
+- Lot identifier
+- Individual quantity
+- Individual side
+- Individual SL
+- Current LTP
+- Individual target
+- Position type
+- Individual buy average
+- Individual sell average
+- Individual realized P&L
+- Individual unrealized P&L
+- Individual exit action
+
+Use visually distinguishable nested rows with appropriate indentation or a subtle background difference.
+
+Support multiple expanded symbols simultaneously.
+
+Preserve expansion state when positions are refreshed or WebSocket updates arrive.
+
+### C. Individual Lot Controls
+
+Every lot must independently support:
+
+1. Set SL.
+2. Modify SL.
+3. Enable/disable SL.
+4. Set Target.
+5. Modify Target.
+6. Enable/disable Target.
+7. Configure Trailing Stop Loss.
+8. Exit individual lot.
+
+Provide an intuitive interaction for editing SL and Target, preferably inline editing or a compact dialog.
+
+Changes to one lot must not modify another lot's configuration.
+
+### D. Independent Execution Behaviour
+
+This is a critical requirement.
+
+Example:
+
+Symbol: NIFTY 26DEC01 CALL 26200
+
+- Lot 1: SL = 45, Target = 60
+- Lot 2: SL = 42, Target = 65
+- Lot 3: SL = 40, Target = 70
+
+Expected behaviour:
+
+- If Lot 1 hits SL, execute the exit for Lot 1 only.
+- If Lot 2 hits Target, execute the exit for Lot 2 only.
+- Lot 3 must continue trading with its existing SL and Target.
+- Exiting Lot 1 must not affect Lot 2 or Lot 3.
+- Closing the entire symbol must remain available through the parent-level Exit action.
+
+Do not trigger a full-symbol exit when an individual lot reaches its SL or Target.
+
+### E. Buy Price, Sell Price and P&L
+
+Track individual lot-level execution details.
+
+For every lot, maintain:
+
+- Entry order ID.
+- Entry execution details.
+- Actual average buy price.
+- Exit order ID.
+- Actual average sell price.
+- Executed quantity.
+- Remaining quantity.
+- Realized P&L.
+- Unrealized P&L.
+- Entry timestamp.
+- Exit timestamp.
+- Lot status.
+
+Calculate P&L using actual execution prices and quantities, not LTP approximations.
+
+For a BUY position:
+
+Unrealized P&L = (Current LTP - Entry Average Price) × Remaining Quantity
+
+Realized P&L = (Exit Average Price - Entry Average Price) × Exited Quantity
+
+Handle partial fills and partial exits correctly.
+
+Display appropriate values for closed lots.
+
+### F. Parent-Level Aggregation
+
+The parent symbol row must calculate its values from the underlying lot records.
+
+- Total quantity = Sum of remaining lot quantities.
+- Buy average = Quantity-weighted entry average.
+- Sell average = Quantity-weighted exit average.
+- Realized P&L = Sum of realized P&L across lots.
+- Unrealized P&L = Sum of unrealized P&L across lots.
+- Total P&L = Realized + Unrealized.
+
+Do not simply add individual average prices.
+
+Ensure the parent-level values reconcile with the broker's actual net position and executions.
+
+## 3. Backend Architecture
+
+Implement lot-level position management in the backend.
+
+Do not implement SL and Target execution logic exclusively in the frontend.
+
+Each lot must have a stable unique identifier independent of its trading symbol.
+
+Introduce or extend a lot-level position model containing:
+
+- lotId
+- positionId
+- symbol
+- exchange
+- productType
+- side
+- quantity
+- remainingQuantity
+- entryOrderId
+- entryAveragePrice
+- exitOrderIds
+- exitAveragePrice
+- stopLoss
+- target
+- trailingStopLoss
+- realizedPnl
+- unrealizedPnl
+- status
+- createdAt
+- updatedAt
+
+Adapt the model to the existing scalpX architecture rather than introducing duplicate position-management systems.
+
+## 4. Broker Reconciliation
+
+Flattrade may expose positions at an aggregated symbol/product level rather than providing independent broker positions for every application lot.
+
+Account for this explicitly.
+
+Maintain an internal lot allocation ledger in the backend.
+
+Associate broker executions and order IDs with their corresponding internal lot allocations.
+
+Never fabricate individual broker execution prices by dividing an aggregated position.
 
 Reconcile:
 
-1. Broker positions.
-2. Open and pending orders.
-3. Completed orders.
-4. Trade book and execution fills.
-5. BUY order execution status.
-6. SELL order execution status.
-7. Partially filled orders.
-8. Remaining open quantities.
-9. Average entry and exit prices.
-10. SL and target rules.
-11. Suspended protection rules.
-12. Pending exit requests.
-13. Uncertain or timed-out broker requests.
-14. Internal position lifecycle state.
-15. Duplicate or conflicting orders.
+- Broker net quantity.
+- Internal lot allocations.
+- Entry executions.
+- Exit executions.
+- Pending orders.
+- Partially filled orders.
+- Cancelled orders.
+- Rejected orders.
 
-Use broker endpoints efficiently. Prefer bulk retrieval and batch reconciliation instead of issuing unnecessary requests for each individual position.
+Prevent duplicate exits and accidental over-selling.
 
-## 3. Automatic protection recovery
+If the broker cannot independently distinguish individual lots, use the backend's execution allocation model to maintain lot-level accounting while ensuring actual exchange orders close only the intended quantity.
 
-If an open position exists but its protection is missing, suspended or inconsistent:
+## 5. SL and Target Execution Engine
 
-- Automatically identify the actual open quantity.
-- Reconstruct the position's correct lifecycle.
-- Restore its valid SL and target rules.
-- Resume monitoring when the required state has been established.
-- Never require manual verification or manual reactivation during recoverable failures.
-- Never silently mark an unverified position as protected.
+Integrate lot-level SL and Target into the existing trading engine.
 
-For positions where protection parameters cannot be safely reconstructed, preserve the last valid protection configuration and raise an actionable internal recovery condition. Do not invent SL or target values.
+Every active lot must have its own protection rules.
 
-## 4. Automatic exit execution
+The execution engine must:
 
-When SL or target triggers:
+1. Monitor active lot-level rules.
+2. Evaluate SL and Target independently.
+3. Execute the corresponding exit quantity.
+4. Track order acknowledgement and execution.
+5. Handle partial fills.
+6. Update the lot's remaining quantity.
+7. Reconcile broker positions.
+8. Update the UI through the existing real-time communication mechanism.
 
-- Automatically submit a LIVE SELL order.
-- Use the actual remaining broker position quantity.
-- Ensure only one active exit operation exists for a position.
-- Handle partial fills.
-- Reconcile uncertain requests before retrying.
-- Never create duplicate SELL orders.
-- Mark CLOSED only after broker reconciliation confirms the position is flat.
+Ensure multiple lots of the same symbol can have different protection prices.
 
-The reconciliation scheduler must also discover positions whose exit should have occurred but whose exit request failed or was left unresolved.
+Do not create conflicting exit orders that can oversell the broker position.
 
-## 5. Real-time risk monitoring must remain independent
+Preserve the existing live Flattrade execution architecture. Do not introduce paper trading as a fallback.
 
-Do not replace real-time LTP monitoring with 3-second reconciliation.
+## 6. Real-Time UI Updates
 
-- WebSocket market data remains responsible for real-time price updates.
-- The risk engine evaluates SL and target triggers using live market data.
-- The centralized backend execution service remains the sole authority for broker order submission.
-- Reconciliation independently verifies that the resulting broker state matches the expected state.
+Update the expanded lot rows through the existing WebSocket infrastructure.
 
-There must be no competing exit execution authorities.
+Refresh:
 
-## 6. Failure handling
+- LTP.
+- Individual unrealized P&L.
+- Individual SL/Target status.
+- Remaining quantity.
+- Realized P&L.
+- Order execution status.
 
-Handle:
+Do not reload the entire page for every market tick.
 
-- Flattrade API timeouts.
-- Network disconnections.
-- Authentication/session expiry.
-- Rate limits.
-- Broker errors.
-- Partial execution.
-- Missing or stale market data.
-- Backend restarts.
-- WebSocket reconnects.
-- Conflicting broker and application state.
+Avoid unnecessary React re-renders.
 
-Use bounded retries, backoff where appropriate, request timeouts and circuit-breaker protection.
+## 7. Backward Compatibility
 
-The scheduler must continue attempting reconciliation every 3 seconds without allowing overlapping requests or violating broker API limits. If the broker imposes rate limits, batch requests and coordinate API calls centrally.
+Existing positions created before this feature must continue to work.
 
-A failed cycle must not permanently stop future reconciliation cycles.
+For existing aggregated positions:
 
-## 7. Monitoring and observability
+- Do not arbitrarily split historical positions into fabricated lots.
+- Create lot allocations from actual available entry execution records.
+- If individual execution history is unavailable, retain an explicitly marked legacy aggregated position until it can be reconciled.
 
-Record:
+Existing Buy CE, Buy PE, Sell CE, Sell PE, Buy Both, Sell Both, Close All, and Cancel Orders functionality must continue working.
 
-- Reconciliation cycle ID.
-- Start and completion timestamps.
-- Duration.
-- Broker API calls and response status.
-- Number of positions checked.
-- Number of orders checked.
-- Number of discrepancies found.
-- Number of discrepancies automatically repaired.
-- Number of positions requiring further recovery.
-- Last successful reconciliation timestamp.
+## 8. Testing Requirements
 
-Expose a backend health/status endpoint showing:
+Add tests covering:
 
-- Scheduler running status.
-- Last successful reconciliation.
-- Last attempted reconciliation.
-- Current reconciliation status.
-- Active position count.
-- Unresolved reconciliation count.
+1. One symbol with one lot.
+2. One symbol with three lots.
+3. Different SL values across lots.
+4. Different Target values across lots.
+5. One lot hitting SL while other lots remain open.
+6. One lot hitting Target while other lots remain open.
+7. Individual lot exit.
+8. Parent-level Exit All.
+9. Partial entry fills.
+10. Partial exit fills.
+11. Multiple lots with different entry prices.
+12. Broker reconciliation.
+13. Duplicate exit prevention.
+14. WebSocket updates.
+15. Application restart and restoration of lot-level state.
 
-The UI should show simple statuses, not technical reconciliation logs.
+## 9. Implementation Instructions
 
-## 8. Performance and reliability
+Before making changes:
 
-- Do not allow a slow reconciliation cycle to block order placement or real-time risk monitoring.
-- Avoid unnecessary database writes when nothing has changed.
-- Use atomic updates and idempotency.
-- Protect against concurrent modifications by order-management and risk-management services.
-- Support application restarts and multiple backend instances safely.
-- Ensure one authoritative state per position.
+- Inspect the existing frontend Positions table.
+- Inspect backend position models and services.
+- Inspect order execution and SL/Target monitoring.
+- Inspect Flattrade order and position reconciliation.
+- Identify how existing positions are grouped by symbol.
+- Identify how executions are currently associated with positions.
 
-## 9. User experience
+Reuse existing architecture wherever possible.
 
-Remove routine manual reconciliation workflows.
+Do not introduce a separate trading engine.
 
-Users should not need to:
-- Click Verify with Flattrade.
-- Manually reactivate protection.
-- Manually reconcile positions.
-- Refresh the app to synchronize broker state.
+Do not break existing working functionality.
 
-Show only:
-- OPEN – PROTECTED
-- OPEN – RECOVERING
-- EXITING
-- EXIT PARTIALLY FILLED
-- CLOSED
-- ACTION REQUIRED
+Do not use mock data or simulated executions.
 
-Only show ACTION REQUIRED when automatic recovery genuinely cannot safely resolve the state.
+Implement the complete feature across frontend, backend, persistence, WebSocket events, and broker integration.
 
-## 10. Testing and acceptance criteria
+Run relevant tests, type checking, and production builds.
 
-Use mocked Flattrade responses for all automated tests. Never submit real-money orders during development or testing.
-
-Verify:
-
-- Scheduler executes at the configured 3-second interval.
-- No overlapping cycles occur.
-- Multiple open positions are reconciled.
-- Pending orders and partial fills are reconciled.
-- Missing protection is automatically recovered.
-- A failed cycle does not stop future cycles.
-- Backend restart restores reconciliation.
-- WebSocket reconnect triggers immediate reconciliation.
-- Duplicate SELL orders are prevented.
-- An uncertain SELL request is resolved before another SELL is submitted.
-- SL and target continue triggering through real-time market data.
-- No simulated or paper trading mode is introduced.
-
-## Implementation instructions
-
-First inspect the existing architecture across all four repositories:
-
-- steadfast-monorepo
-- steadfast-api
-- steadfast-websocket
-- steadfast-app
-
-Identify existing reconciliation logic and reuse or refactor it instead of creating duplicate mechanisms.
-
-Implement this as a centralized backend service with clear ownership, tests, structured logging and documentation.
-
-Do not simply add a setInterval() call that repeatedly invokes existing reconciliation endpoints.
-
-Do not hide errors or falsely report successful reconciliation.
-
-Do not change the LIVE trading configuration, and never place actual broker orders during development or testing.
-
-Deliver a summary of changed files, architecture, tests, remaining limitations and deployment requirements.
+Provide a summary of changed files, architecture decisions, test results, and any limitations in broker-level lot identification.
