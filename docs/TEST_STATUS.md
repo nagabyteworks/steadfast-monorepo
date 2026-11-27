@@ -7,8 +7,11 @@ working tree, not a production or end-to-end safety certification.
 
 | Suite / command | Result | Scope |
 | --- | --- | --- |
-| `npm run test --prefix steadfast-api` | 69 passed | Full API suite, including persisted lot-ledger allocation and restart restoration. |
+| `npm run test --prefix steadfast-api` | 70 passed | Full API suite plus lot reservation and partial-fill reconciliation test. |
 | `npm run test:unit --prefix steadfast-app -- --run src/components/PositionsTableComponent.test.js` | 2 passed | Positions table reconciliation UX and three-lot expandable rendering. |
+| Accordion regression | 2 passed | Desktop expand/collapse and lot-row rendering. |
+| `npm run test:unit --prefix steadfast-app -- --run src/composables/useRiskManagement.test.js src/components/PositionsTableComponent.test.js` | 24 passed | Protection remove/re-add regression and three-lot Positions table rendering. |
+| `node --test steadfast-api/test/riskRoutes.test.js steadfast-api/test/riskStore.test.js` | 37 passed | Re-adding protection, legacy average/LTP fallback, stale-history rejection and lot partial-fill reservation. |
 | `npm run build --prefix steadfast-app` | Passed | Production frontend build; Vite reports the existing large-chunk warning. |
 
 Lot allocation is derived from available broker TradeBook fills and is not a
